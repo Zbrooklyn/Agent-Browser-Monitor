@@ -180,7 +180,7 @@ const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13h';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13i';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -331,8 +331,6 @@ body.select .pin,body.dragging .pin{display:none}
 /* fill-the-glass: rotate the view 90° (element takes swapped dims; applyZoom adds the rotate transform) */
 #focus.rot #fimg{inset:auto;top:50%;left:50%;width:100vh;height:100vw;transform-origin:center}
 .fbtn.on{color:var(--live)}
-#fpin.on{color:#e8c66a}
-#fpin.on svg{fill:#e8c66a}
 #fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
@@ -365,7 +363,7 @@ body.select .pin,body.dragging .pin{display:none}
 #fnav button{width:48px;height:42px;border:none;background:transparent;color:#fff;font-size:21px;cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center}
 #fnav button:active{background:#ffffff22}
 #fzap svg{width:18px;height:18px;fill:currentColor;stroke:none}
-#flbl{color:#cfcfd6;font-size:12.5px;font-weight:600;padding:0 13px;min-width:54px;text-align:center;font-variant-numeric:tabular-nums}
+#flbl{color:#cfcfd6;font-size:13px;font-weight:600;padding:0 12px;min-width:56px;text-align:center;white-space:nowrap;flex:0 0 auto;font-variant-numeric:tabular-nums}
 #focus.idle #fbar,#focus.idle #fnav{opacity:0;pointer-events:none}
 /* embed mode: chrome-less single stream */
 body.embed #hdr,body.embed #grid,body.embed #fbar,body.embed #fnav{display:none!important}
@@ -401,7 +399,7 @@ body.embed #focus{display:block}
 <div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
-const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next');
+const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
 const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fmore=document.getElementById('fmore'),fmenu=document.getElementById('fmenu');
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
 const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge');
@@ -448,7 +446,7 @@ function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle'
   fdot.className='dot '+st;                                    // dot colored by live/idle/stuck state
   const ago=st==='active'?'live':(st==='stuck'?'stuck '+fmtAgo(m.lastChangeMs):fmtAgo(m.lastChangeMs));
   ftime.textContent=ago?('· '+ago):'';ftime.className=st==='stuck'?'stuck':'';
-  const i=order.indexOf(focusSlug);flbl.textContent=order.length>1?((i+1)+' / '+order.length):'';prev.style.visibility=next.style.visibility=order.length>1?'':'hidden';
+  const i=order.indexOf(focusSlug);const hasMany=order.length>1;flbl.textContent=hasMany?((i+1)+' / '+order.length):'';if(fnav)fnav.style.display=hasMany?'':'none';  // hide the pager entirely when there's nothing to page through
   document.title=(m.title?m.title.replace(/(?: · Agent Browsers)+$/,'')+' · ':'')+'Agent Browsers';} // strip repeats so a self-viewing session can't compound the title
 
 // ---------- routing ----------

@@ -198,9 +198,9 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13t';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13x';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
-const GRID = `<!doctype html><html><head><meta charset="utf-8">
+const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0b0b0b">
@@ -330,7 +330,7 @@ body.reorder #donebar{display:block}
 #hint{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:56;display:none;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:rgba(28,28,32,.95);backdrop-filter:blur(10px);border:1px solid var(--line2);box-shadow:0 12px 36px #000b}
 #hint.show{display:flex}
 #hint span{flex:1;font-size:12.8px;line-height:1.45;color:#cfcfd6}
-#hintok{flex:0 0 auto;border:none;border-radius:9px;background:var(--live);color:#06210d;font-size:13px;font-weight:700;padding:9px 16px;cursor:pointer}
+#hintok{flex:0 0 auto;border:none;border-radius:9px;background:var(--live);color:#06210d;font-size:13px;font-weight:700;padding:12px 18px;cursor:pointer}
 #hintok:active{transform:scale(.96)}
 .tile .sk{position:absolute;inset:0;background:linear-gradient(100deg,#161619 30%,#202026 50%,#161619 70%);background-size:220% 100%;animation:shim 1.25s linear infinite}
 @keyframes shim{0%{background-position:120% 0}100%{background-position:-120% 0}}
@@ -358,8 +358,11 @@ body.select .pin,body.dragging .pin{display:none}
 #empty{display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;color:var(--muted);min-height:62vh;padding:40px 24px}
 #empty.on{display:flex}
 #empty .mark{width:54px;height:54px;opacity:.5}
-#empty h2{margin:0;font-size:17px;color:#cfcfd6;font-weight:650}
+#empty h2{margin:0 0 8px;font-size:17px;color:#cfcfd6;font-weight:650}
 #empty p{margin:0;max-width:340px;line-height:1.5;font-size:13px}
+#empty .emsg-off{display:none}
+body.offline #empty .emsg{display:none}
+body.offline #empty .emsg-off{display:block}
 #focus{position:fixed;inset:0;background:#000;display:none;z-index:50}
 #focus.on{display:block}
 #fimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;touch-action:none;transform-origin:0 0;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
@@ -423,17 +426,20 @@ body.embed #focus{display:block}
   .mrow{padding:14px 12px;font-size:14px}
   .msec{padding:11px 12px 5px}
 }
+/* respect reduced-motion: kill the pulses/spinners/slides for users who ask for it */
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 </style></head><body>
-<header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
+<header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" aria-label="Filter sessions by name" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
 <div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
 <div id="netbanner"><span class="nspin"></span><span>Reconnecting…</span></div>
-<div id="grid"></div>
+<main id="grid" role="main" aria-label="Agent browsers"></main>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
-<div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
-<div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
+<div id="empty">${MARK}<div class="emsg"><h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div><div class="emsg-off"><h2>Can&rsquo;t reach the dashboard</h2><p>The server looks offline. This reconnects automatically the moment it&rsquo;s back.</p></div></div>
+<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
@@ -466,8 +472,8 @@ function domainOf(u){try{const x=new URL(u);return x.hostname.replace(/^www\\./,
 const netbanner=document.getElementById('netbanner');
 let netTimer=null,netDown=false;
 function netStatus(ok){
-  if(ok){netDown=false;if(netTimer){clearTimeout(netTimer);netTimer=null;}netbanner.classList.remove('show');}
-  else if(!netDown&&!netTimer){netTimer=setTimeout(()=>{netDown=true;netTimer=null;netbanner.classList.add('show');},1500);} // only surface a sustained drop
+  if(ok){netDown=false;if(netTimer){clearTimeout(netTimer);netTimer=null;}netbanner.classList.remove('show');document.body.classList.remove('offline');}
+  else if(!netDown&&!netTimer){netTimer=setTimeout(()=>{netDown=true;netTimer=null;netbanner.classList.add('show');document.body.classList.add('offline');},1500);} // only surface a sustained drop (also swaps the empty-state copy to "can't reach the dashboard")
 }
 function openFeed(){ if(feedES)return; feedES=new EventSource('/api/feed');
   feedES.onopen=()=>netStatus(true);
@@ -491,6 +497,7 @@ function fmtAgo(ms){if(ms==null)return '';const s=Math.round(ms/1000);if(s<2)ret
 // keep the focus-bar title tight: a page <title> like "Stripe | Financial Infrastructure…" shows as just "Stripe"
 function shortTitle(t){if(!t)return '';const p=t.split(/\\s[|\\u2013\\u2014\\u00b7-]\\s/)[0].trim();return p||t;}
 function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle';if(!editing)fname.textContent=shortTitle(m.title)||focusSlug;
+  focus.setAttribute('aria-label',(shortTitle(m.title)||focusSlug||'session')+' live view');   // focus img stays alt="" (data-URI); label the region instead
   const pr=fmenu&&fmenu.querySelector('.pinrow');if(pr)pr.classList.toggle('on',pins.has(focusSlug)); // reflect pin state in the menu
   fdom.textContent=m.url||'';                                  // full URL, not just the domain
   fdot.className='dot '+st;                                    // dot colored by live/idle/stuck state
@@ -579,10 +586,12 @@ fimg.addEventListener('dblclick',()=>{z>1?resetZoom():(z=2,applyZoom());});
 
 // ---------- tiles ----------
 function setTabs(x,n){x.tn.textContent=n;x.el.classList.toggle('multi',n>1);}
-function addTile(s){const el=document.createElement('div');el.className='tile';el.dataset.id=s.id;
-  el.innerHTML='<div class="sk"></div><img draggable="false"><div class="check">&#x2713;</div><span class="badge"><i></i><span class="bt">LIVE</span></span><button class="pin" aria-label="Pin">${ICOSTAR}</button><span class="tabs">${ICOTAB}<span class="tn"></span></span><div class="lbl"><span class="t"></span><span class="d"></span></div>';
+function addTile(s){const el=document.createElement('div');el.className='tile';el.dataset.id=s.id;el.setAttribute('role','button');el.tabIndex=0;
+  el.innerHTML='<div class="sk"></div><img draggable="false" alt=""><div class="check">&#x2713;</div><span class="badge"><i></i><span class="bt">LIVE</span></span><button class="pin" aria-label="Pin">${ICOSTAR}</button><span class="tabs">${ICOTAB}<span class="tn"></span></span><div class="lbl"><span class="t"></span><span class="d"></span></div>';
   const img=el.querySelector('img'),t=el.querySelector('.t'),d=el.querySelector('.d'),tn=el.querySelector('.tn'),bt=el.querySelector('.bt'),pin=el.querySelector('.pin');
-  t.textContent=nameOf(s);d.textContent=domainOf(s.url);el.onclick=()=>tileClick(s.id);setupDrag(el,s.id);
+  t.textContent=nameOf(s);d.textContent=domainOf(s.url);el.setAttribute('aria-label',nameOf(s));el.onclick=()=>tileClick(s.id);  // thumbnail stays alt="" (decorative); the button's aria-label is the accessible name
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tileClick(s.id);}});  // keyboard-activate the tile
+  setupDrag(el,s.id);
   pin.addEventListener('pointerdown',e=>e.stopPropagation());           // don't start a drag from the star
   pin.onclick=e=>{e.stopPropagation();togglePin(s.id);};
   grid.appendChild(el);const x={el,img,t,d,tn,bt,visible:true};tiles.set(s.id,x);setTabs(x,s.tabs);if(selSet.has(s.id))el.classList.add('sel');if(pins.has(s.id))el.classList.add('pinned');io.observe(el);}
@@ -671,7 +680,7 @@ function applyGrid(){
   if(pins.size&&!customOrder)list.sort((a,b)=>(pins.has(a.id)?0:1)-(pins.has(b.id)?0:1)); // favorites float to top in AUTO sort only — a manual drag order is respected exactly (else a pin yanks a just-dropped tile out of place)
   const want=new Set(list.map(s=>s.id));
   for(const id of [...tiles.keys()])if(!want.has(id))removeTile(id);
-  for(const s of list){if(!tiles.has(s.id))addTile(s);const x=tiles.get(s.id);x.t.textContent=nameOf(s);x.d.textContent=domainOf(s.url);setState(x,s);setTabs(x,s.tabs);x.el.classList.toggle('pinned',pins.has(s.id));x.el.style.order=list.indexOf(s);}
+  for(const s of list){if(!tiles.has(s.id))addTile(s);const x=tiles.get(s.id);x.t.textContent=nameOf(s);x.d.textContent=domainOf(s.url);x.el.setAttribute('aria-label',nameOf(s));setState(x,s);setTabs(x,s.tabs);x.el.classList.toggle('pinned',pins.has(s.id));x.el.style.order=list.indexOf(s);}
   order=list.map(s=>s.id);
   empty.classList.toggle('on',list.length===0&&!focus.classList.contains('on'));
   grid.style.display=focus.classList.contains('on')?'none':(list.length===0?'none':'');

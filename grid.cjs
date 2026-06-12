@@ -178,7 +178,9 @@ const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <style>
 :root{color-scheme:dark;--bg:#0b0b0d;--panel:#141417;--line:#26262c;--line2:#34343c;--muted:#8a8a93;--live:#2ecc40}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:#e6e6ea;font:14px system-ui,Segoe UI,Roboto,sans-serif;height:100%;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+html,body{margin:0;background:var(--bg);color:#e6e6ea;font:14px system-ui,Segoe UI,Roboto,sans-serif;height:100%;-webkit-font-smoothing:antialiased;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+/* custom touch gestures own the long-press/drag — re-enable native text behavior only where typing happens */
+input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
 ::selection{background:#2ecc4055}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a2a30;border-radius:6px}::-webkit-scrollbar-thumb:hover{background:#3a3a42}::-webkit-scrollbar-track{background:transparent}
 #top{position:sticky;top:0;z-index:10}
@@ -259,7 +261,7 @@ body.embed #top{display:none!important}
 @keyframes ptrspin{to{transform:rotate(360deg)}}
 .tile{position:relative;background:#000;border:1px solid var(--line);border-radius:13px;overflow:hidden;aspect-ratio:16/10;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s}
 @media(hover:hover){.tile:hover{border-color:var(--line2);transform:translateY(-2px);box-shadow:0 8px 24px #0009}}
-.tile img{width:100%;height:100%;object-fit:contain;display:block;background:#000;opacity:0;transition:opacity .35s}
+.tile img{width:100%;height:100%;object-fit:contain;display:block;background:#000;opacity:0;transition:opacity .35s;-webkit-user-drag:none;user-select:none;pointer-events:none}
 .tile.ready img{opacity:1}
 body.fit-cover .tile img,body.fit-cover #fimg{object-fit:cover}
 /* hold-to-reorder: lifted tile follows the finger; others dim; page scroll locked during the drag */
@@ -297,7 +299,7 @@ body.select .pin,body.dragging .pin{display:none}
 #empty p{margin:0;max-width:340px;line-height:1.5;font-size:13px}
 #focus{position:fixed;inset:0;background:#000;display:none;z-index:50}
 #focus.on{display:block}
-#fimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;touch-action:none;transform-origin:0 0}
+#fimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;touch-action:none;transform-origin:0 0;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
 /* fill-the-glass: rotate the view 90° (element takes swapped dims; applyZoom adds the rotate transform) */
 #focus.rot #fimg{inset:auto;top:50%;left:50%;width:100vh;height:100vw;transform-origin:center}
 .fbtn.on{color:var(--live)}
@@ -363,7 +365,7 @@ body.embed #focus{display:block}
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
-<div id="focus"><img id="fimg"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span id="fname" title="Tap to rename"></span><button id="fpen" aria-label="Rename" title="Tap to rename">${ICOPEN}</button></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fpin" class="fbtn glass" aria-label="Pin to top" title="Pin to top">${ICOSTAR}</button><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
+<div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span id="fname" title="Tap to rename"></span><button id="fpen" aria-label="Rename" title="Tap to rename">${ICOPEN}</button></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fpin" class="fbtn glass" aria-label="Pin to top" title="Pin to top">${ICOSTAR}</button><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next');
@@ -455,6 +457,8 @@ function commitRename(save){if(!editing)return;editing=false;fname.contentEditab
 fname.addEventListener('keydown',e=>{if(!editing)return;e.stopPropagation();if(e.key==='Enter'){e.preventDefault();commitRename(true);}else if(e.key==='Escape'){e.preventDefault();commitRename(false);}});
 fname.addEventListener('blur',()=>commitRename(true));
 addEventListener('keydown',e=>{if(!focus.classList.contains('on'))return;if(e.key==='Escape')nav('/');else if(e.key==='ArrowRight')step(1);else if(e.key==='ArrowLeft')step(-1);else if(e.key==='f')ffs.onclick(e);});
+// our long-press IS the drag gesture — kill the browser's native long-press/right-click menu everywhere except text fields
+addEventListener('contextmenu',e=>{if(e.target&&e.target.closest&&e.target.closest('input,textarea,[contenteditable="true"]'))return;e.preventDefault();});
 
 // ---------- pinch-zoom + pan on focus image ----------
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms||10);}catch(_){}}
@@ -482,7 +486,7 @@ fimg.addEventListener('dblclick',()=>{z>1?resetZoom():(z=2,applyZoom());});
 // ---------- tiles ----------
 function setTabs(x,n){x.tn.textContent=n;x.el.classList.toggle('multi',n>1);}
 function addTile(s){const el=document.createElement('div');el.className='tile';el.dataset.id=s.id;
-  el.innerHTML='<div class="sk"></div><img><div class="check">&#x2713;</div><span class="badge"><i></i><span class="bt">LIVE</span></span><button class="pin" aria-label="Pin">${ICOSTAR}</button><span class="tabs">${ICOTAB}<span class="tn"></span></span><div class="lbl"><span class="t"></span><span class="d"></span></div>';
+  el.innerHTML='<div class="sk"></div><img draggable="false"><div class="check">&#x2713;</div><span class="badge"><i></i><span class="bt">LIVE</span></span><button class="pin" aria-label="Pin">${ICOSTAR}</button><span class="tabs">${ICOTAB}<span class="tn"></span></span><div class="lbl"><span class="t"></span><span class="d"></span></div>';
   const img=el.querySelector('img'),t=el.querySelector('.t'),d=el.querySelector('.d'),tn=el.querySelector('.tn'),bt=el.querySelector('.bt'),pin=el.querySelector('.pin');
   t.textContent=nameOf(s);d.textContent=domainOf(s.url);el.onclick=()=>tileClick(s.id);setupDrag(el,s.id);
   pin.addEventListener('pointerdown',e=>e.stopPropagation());           // don't start a drag from the star
@@ -649,7 +653,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12f';
+const SW_VER = '2026-06-12g';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

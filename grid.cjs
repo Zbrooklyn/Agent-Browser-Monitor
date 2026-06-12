@@ -161,6 +161,7 @@ const ICOFUN = '<svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></sv
 const ICOROT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 9"/><path d="M3 21v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 15"/></svg>';
 const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.9l6.5-.9z"/></svg>';
 const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
@@ -269,6 +270,15 @@ body.dragging{touch-action:none}
 body.dragging .tile{transition:none}
 body.dragging #grid .tile:not(.drag){opacity:.5}
 .tile.drag{position:fixed;margin:0;opacity:.96;transform:scale(1.03);box-shadow:0 18px 44px #000e;z-index:60;border-color:var(--live)!important;transition:none;will-change:left,top}
+/* reorder mode: tiles own the touch from the start (touch-action:none) so a drag never fights page-scroll; tap-to-open is disabled */
+body.reorder #grid .tile{touch-action:none;outline:2px dashed #ffffff3a;outline-offset:-3px;cursor:grab}
+body.reorder #grid .tile:not(.drag){animation:rwob .5s ease-in-out infinite alternate}
+@keyframes rwob{from{transform:rotate(-.45deg)}to{transform:rotate(.45deg)}}
+body.reorder .tile .pin{display:none}
+#donebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));z-index:58;display:none}
+body.reorder #donebar{display:block}
+#donebtn{background:var(--live);color:#06140b;font-weight:700;border:none;border-radius:999px;padding:13px 30px;font-size:15px;box-shadow:0 12px 34px #000b;cursor:pointer}
+#donebtn:active{transform:scale(.96)}
 .tile .sk{position:absolute;inset:0;background:linear-gradient(100deg,#161619 30%,#202026 50%,#161619 70%);background-size:220% 100%;animation:shim 1.25s linear infinite}
 @keyframes shim{0%{background-position:120% 0}100%{background-position:-120% 0}}
 .tile.ready .sk{display:none}
@@ -360,10 +370,11 @@ body.embed #focus{display:block}
 }
 </style></head><body>
 <header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
-<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="ck">${ICOCHK}</span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div></div></header>
+<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="ck">${ICOCHK}</span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div></div></header>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
+<div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
 <div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span id="fname" title="Tap to rename"></span><button id="fpen" aria-label="Rename" title="Tap to rename">${ICOPEN}</button></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fpin" class="fbtn glass" aria-label="Pin to top" title="Pin to top">${ICOSTAR}</button><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
@@ -373,7 +384,8 @@ const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
 const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge');
 const selbtn=document.getElementById('selbtn'),optbtn=document.getElementById('optbtn'),optmenu=document.getElementById('optmenu'),fitrow=document.getElementById('fitrow'),activerow=document.getElementById('activerow'),selrow=document.getElementById('selrow'),watchfab=document.getElementById('watchfab'),watchn=document.getElementById('watchn');
-let selectMode=false; const selSet=new Set();
+const reorderrow=document.getElementById('reorderrow'),donebtn=document.getElementById('donebtn');
+let selectMode=false,reorderMode=false; const selSet=new Set();
 const tiles=new Map(),meta=new Map(); let order=[],all=[];
 let customOrder=null;try{customOrder=JSON.parse(localStorage.getItem('order')||'null');}catch(_){}   // user's drag-reordered tile order
 let pins=new Set();try{pins=new Set(JSON.parse(localStorage.getItem('pins')||'[]'));}catch(_){}      // favorited tiles (sort to top)
@@ -493,13 +505,19 @@ function addTile(s){const el=document.createElement('div');el.className='tile';e
   pin.onclick=e=>{e.stopPropagation();togglePin(s.id);};
   grid.appendChild(el);const x={el,img,t,d,tn,bt,visible:true};tiles.set(s.id,x);setTabs(x,s.tabs);if(selSet.has(s.id))el.classList.add('sel');if(pins.has(s.id))el.classList.add('pinned');io.observe(el);}
 function togglePin(id){if(pins.has(id))pins.delete(id);else pins.add(id);try{localStorage.setItem('pins',JSON.stringify([...pins]));}catch(_){}const x=tiles.get(id);if(x)x.el.classList.toggle('pinned',pins.has(id));buzz(12);applyGrid();}
-function tileClick(id){if(Date.now()-lastDragEnd<350)return;buzz();if(selectMode)toggleSel(id);else openFocus(id);}
-// long-press a tile, then drag to reorder; the order persists and becomes the default ordering
-function setupDrag(el,id){let lp=null,on=false,sx=0,sy=0,cx=0,cy=0;
-  el.addEventListener('pointerdown',e=>{if(selectMode||focus.classList.contains('on'))return;sx=cx=e.clientX;sy=cy=e.clientY;on=false;
-    lp=setTimeout(()=>{on=true;beginDrag(id,cx,cy);buzz(20);try{el.setPointerCapture(e.pointerId);}catch(_){}},380);});
-  el.addEventListener('pointermove',e=>{cx=e.clientX;cy=e.clientY;if(!on){if(Math.abs(cx-sx)>10||Math.abs(cy-sy)>10)clearTimeout(lp);return;}e.preventDefault();moveDrag(cx,cy);});
-  const end=()=>{clearTimeout(lp);if(on){on=false;endDrag();}};
+function tileClick(id){if(reorderMode)return;if(Date.now()-lastDragEnd<350)return;buzz();if(selectMode)toggleSel(id);else openFocus(id);}
+// Two ways to reorder: (1) Reorder mode — tiles have touch-action:none so a drag starts on a tiny move with no
+// scroll fight (the reliable path); (2) normal mode — a ~300ms long-press arms it (convenience). Order persists.
+function setupDrag(el,id){let lp=null,on=false,sx=0,sy=0,cx=0,cy=0,pend=false,pid=0;
+  const arm=()=>{on=true;pend=false;clearTimeout(lp);beginDrag(id,cx,cy);buzz(reorderMode?14:20);try{el.setPointerCapture(pid);}catch(_){}};
+  el.addEventListener('pointerdown',e=>{if(selectMode||focus.classList.contains('on'))return;sx=cx=e.clientX;sy=cy=e.clientY;on=false;pend=true;pid=e.pointerId;
+    if(!reorderMode)lp=setTimeout(()=>{if(pend)arm();},300);});                          // long-press only in normal mode
+  el.addEventListener('pointermove',e=>{cx=e.clientX;cy=e.clientY;
+    if(on){e.preventDefault();moveDrag(cx,cy);return;}
+    if(!pend)return;const d=Math.max(Math.abs(cx-sx),Math.abs(cy-sy));
+    if(reorderMode){if(d>6){e.preventDefault();arm();}}                                   // reorder mode: arm on a small move, immediately
+    else if(d>14){clearTimeout(lp);pend=false;}});                                        // moved before the long-press fired = scroll intent, let it go
+  const end=()=>{clearTimeout(lp);pend=false;if(on){on=false;endDrag();}};
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
 let dragOX=0,dragOY=0;                                          // pointer offset inside the lifted tile
 function beginDrag(id,px,py){dragId=id;document.body.classList.add('dragging');const x=tiles.get(id);if(!x)return;const el=x.el;
@@ -594,8 +612,11 @@ document.addEventListener('click',e=>{if(!optmenu.contains(e.target)&&!optbtn.co
 [...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.onclick=()=>{const v=r.dataset.sort;if(v)params.set('sort',v);else params.delete('sort');history.replaceState({},'',location.pathname+qstr());applyGrid();syncBar();});
 fitrow.onclick=()=>{const on=!document.body.classList.contains('fit-cover');document.body.classList.toggle('fit-cover',on);if(on)params.set('fit','cover');else params.delete('fit');history.replaceState({},'',location.pathname+qstr());syncBar();};
 activerow.onclick=()=>{optmenu.classList.remove('open');nav('/active');};
-selbtn.onclick=()=>{selectMode=!selectMode;document.body.classList.toggle('select',selectMode);selbtn.classList.toggle('on',selectMode);if(!selectMode){selSet.clear();[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));watchfab.classList.remove('show');}};
+selbtn.onclick=()=>{if(reorderMode)setReorder(false);selectMode=!selectMode;document.body.classList.toggle('select',selectMode);selbtn.classList.toggle('on',selectMode);if(!selectMode){selSet.clear();[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));watchfab.classList.remove('show');}};
 selrow.onclick=()=>{optmenu.classList.remove('open');selbtn.onclick();};   // sheet Select row reuses the select toggle
+function setReorder(on){reorderMode=on;document.body.classList.toggle('reorder',on);buzz(on?20:8);}  // edit mode: tiles own the touch so drag-reorder never fights scroll
+reorderrow.onclick=()=>{optmenu.classList.remove('open');if(selectMode)selbtn.onclick();setReorder(true);};
+donebtn.onclick=()=>setReorder(false);
 watchfab.onclick=()=>{if(!selSet.size)return;buzz(20);const set=[...selSet];selectMode=false;document.body.classList.remove('select');selbtn.classList.remove('on');watchfab.classList.remove('show');[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));nav('/watch/'+set.join('+'));};
 // collapsible search reflects to ?q
 const searchbtn=document.getElementById('searchbtn'),searchwrap=document.getElementById('searchwrap');
@@ -623,7 +644,7 @@ addEventListener('pointerdown',function once(){if('Notification' in window&&Noti
 // pull-to-refresh: PWA standalone kills the native gesture, so own it on the grid — re-poll + reconnect the stream
 (function(){
   const ptr=document.getElementById('ptr'); const TH=70; let sy=0,dist=0,pulling=false,refreshing=false;
-  const canPull=()=>!refreshing&&window.scrollY<=0&&!focus.classList.contains('on')&&!optmenu.classList.contains('open')&&!document.body.classList.contains('select');
+  const canPull=()=>!refreshing&&window.scrollY<=0&&!focus.classList.contains('on')&&!optmenu.classList.contains('open')&&!document.body.classList.contains('select')&&!document.body.classList.contains('reorder');
   addEventListener('touchstart',e=>{if(e.touches.length!==1||!canPull()){pulling=false;return;}sy=e.touches[0].clientY;dist=0;pulling=true;ptr.style.transition='none';},{passive:true});
   addEventListener('touchmove',e=>{if(!pulling)return;const dy=e.touches[0].clientY-sy;
     if(dy<=0||window.scrollY>0){pulling=false;ptr.style.transition='';ptr.style.transform='';ptr.style.opacity='';ptr.classList.remove('ready');return;}
@@ -653,7 +674,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12g';
+const SW_VER = '2026-06-12h';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

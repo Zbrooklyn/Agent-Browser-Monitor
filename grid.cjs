@@ -100,6 +100,7 @@ async function refresh() {
         // one-time upgrade: a generic session-N slug that now has a real domain earns a real name
         if (/^session-\d+$/.test(s.id)) { const better = deriveSlug(s.url, s.title); if (better) s.id = uniqueSlug(better, port); }
         if (s.wsUrl !== tgt.best.webSocketDebuggerUrl) { s.wsUrl = tgt.best.webSocketDebuggerUrl; try { s.ws && s.ws.close(); } catch {} connect(s); }
+        else if (!s.ws) connect(s);   // CDP socket dropped on a still-alive page → reconnect so the tile doesn't freeze forever
       }
     }
     // prune is DEBOUNCED: a port must be absent for 2 consecutive good sweeps (~10s) before its tile is removed,
@@ -194,7 +195,7 @@ const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13j';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13k';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

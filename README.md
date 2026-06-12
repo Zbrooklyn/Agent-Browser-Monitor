@@ -49,11 +49,10 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
 - **Node.js 22+** — it uses the built-in `WebSocket` global to speak CDP (available
   unflagged from Node 21; 22+ recommended). No other runtime.
 - **No dependencies** — nothing to `npm install`. It is a single `.cjs` file.
-- **Windows for auto-discovery (today).** Tiles are discovered by finding Chromium
-  remote-debugging ports via a PowerShell query, so the zero-config auto-discovery is
-  Windows-only right now. The server and streaming themselves are plain Node and run
-  anywhere — only the port-discovery step is Windows-specific. (Cross-platform discovery
-  is a small, isolated change in `discoverPorts()`; PRs welcome.)
+- **Runs on Windows, macOS, and Linux.** Zero-config auto-discovery finds Chromium
+  remote-debugging ports via PowerShell on Windows and `lsof` on macOS/Linux. On any OS
+  you can also skip discovery entirely by listing ports yourself: `PORTS=9222,9223 node
+  grid.cjs`.
 
 ## Install
 
@@ -68,10 +67,17 @@ node grid.cjs
 Open <http://127.0.0.1:8090>. Launch any Chromium with remote debugging and it shows up:
 
 ```bash
-# Playwright pool / Playwright launches already expose a debug port.
-# Or plain Chrome:
-chrome --remote-debugging-port=9222
+# Playwright / Playwright-pool launches already expose a debug port — nothing to do.
+
+# Or launch a plain browser yourself. The --user-data-dir is REQUIRED: without a
+# separate profile, the flag is silently ignored if that browser is already running.
+chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.chrome-debug"
 ```
+
+On macOS use the full path
+(`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug`);
+on Windows use `"C:\Program Files\Google\Chrome\Application\chrome.exe"` if `chrome` is not
+on your PATH. Any Chromium-family browser works (Edge, Brave, Chromium, Vivaldi).
 
 ### Watch from your phone (private)
 
@@ -100,6 +106,7 @@ node grid.cjs [host] [port]
 | Env | Default | Meaning |
 | --- | --- | --- |
 | `HOST` / `PORT` | `127.0.0.1` / `8090` | bind address |
+| `PORTS` | _(auto-detect)_ | skip auto-discovery and watch exactly these debug ports, e.g. `PORTS=9222,9223` |
 | `TILE_Q` / `TILE_W` / `TILE_H` | `55` / `800` / `500` | grid tile JPEG quality + max size |
 | `HQ_Q` / `HQ_W` / `HQ_H` | `82` / `1920` / `1200` | focused-view JPEG quality + max size |
 | `STUCK_MS` | `90000` | no visual change while live before a session is flagged "stuck" |
@@ -120,6 +127,27 @@ node grid.cjs [host] [port]
 - Binds to `127.0.0.1`. Nothing is exposed until you choose to. A tailnet via
   `tailscale serve` is the recommended private option. **Do not put it on the public
   internet** — the stream has no authentication.
+
+## Troubleshooting
+
+**The grid is empty / "no sessions yet."** Nothing is exposing a CDP debug port, or
+discovery did not find it. Check:
+
+1. Is a browser actually running with `--remote-debugging-port`? Visit
+   `http://127.0.0.1:9222/json` (swap in your port) — you should get a JSON list of tabs.
+   If that page fails, the browser is not listening (most often the `--user-data-dir` was
+   missing, so the flag was ignored because the browser was already open).
+2. Skip discovery and name the port directly: `PORTS=9222 node grid.cjs`. If tiles appear,
+   auto-discovery is the issue; if not, the port is not a live CDP endpoint.
+3. The port must be on `127.0.0.1` (loopback). A browser bound to `0.0.0.0` or a remote
+   host is not auto-discovered — pass it via `PORTS=`.
+
+**A tile shows "stuck."** That session has not painted a new frame for `STUCK_MS` (90s by
+default). A genuinely idle page is normal; lower `STUCK_MS` if you want a tighter signal.
+
+**Can't reach it from my phone.** The server binds to `127.0.0.1` on purpose. Use
+`tailscale serve --bg 8090` (above) and open the printed `https://…ts.net/` URL on a device
+on the same tailnet.
 
 ## Roadmap
 

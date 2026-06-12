@@ -47,13 +47,28 @@ function uniqueSlug(base, selfPort) {
 }
 function sessionBySlug(slug) { for (const s of sessions.values()) if (s.id === slug) return s; return null; }
 
-// ---- discovery (chrome.exe loopback debug ports via PowerShell) -------------
+// ---- discovery: Chromium loopback debug ports -------------------------------
+// Manual override `PORTS=9222,9223` works on every OS. Otherwise auto-detect: PowerShell
+// on Windows, lsof on macOS/Linux. bestTarget() probes /json, so any non-CDP port is ignored.
+const parsePorts = (out) => [...new Set((out || '').split(/\s+/).filter(x => /^\d+$/.test(x)).map(Number))];
 function discoverPorts() {
+  if (process.env.PORTS) return Promise.resolve(parsePorts(process.env.PORTS.replace(/,/g, ' ')));
   return new Promise((resolve) => {
-    const ps = "$pids=(Get-Process chrome -EA SilentlyContinue).Id; Get-NetTCPConnection -State Listen -EA SilentlyContinue | ?{ $_.OwningProcess -in $pids -and $_.LocalAddress -eq '127.0.0.1' } | Select -Expand LocalPort -Unique";
-    execFile('powershell', ['-NoProfile', '-Command', ps], { timeout: 8000 }, (e, out) => {
-      resolve((out || '').split(/\s+/).filter(x => /^\d+$/.test(x)).map(Number));
-    });
+    if (process.platform === 'win32') {
+      const ps = "$pids=(Get-Process chrome,chromium,msedge,brave,vivaldi,thorium -EA SilentlyContinue).Id; Get-NetTCPConnection -State Listen -EA SilentlyContinue | ?{ $_.OwningProcess -in $pids -and $_.LocalAddress -eq '127.0.0.1' } | Select -Expand LocalPort -Unique";
+      execFile('powershell', ['-NoProfile', '-Command', ps], { timeout: 8000 }, (e, out) => resolve(parsePorts(out)));
+    } else {
+      // macOS / Linux: loopback LISTEN ports owned by a Chromium-family process (+c 0 keeps full command names)
+      const names = 'chrome|chromium|brave|msedge|edge|vivaldi|thorium';
+      const byName = `lsof +c 0 -nP -iTCP@127.0.0.1 -sTCP:LISTEN 2>/dev/null | grep -iE '${names}' | grep -oE '127\\.0\\.0\\.1:[0-9]+' | grep -oE '[0-9]+$' | sort -u`;
+      execFile('bash', ['-lc', byName], { timeout: 8000 }, (e, out) => {
+        const ports = parsePorts(out);
+        if (ports.length) return resolve(ports);
+        // fallback: every loopback LISTEN port; bestTarget() filters out non-CDP services
+        const any = `lsof +c 0 -nP -iTCP@127.0.0.1 -sTCP:LISTEN 2>/dev/null | grep -oE '127\\.0\\.0\\.1:[0-9]+' | grep -oE '[0-9]+$' | sort -u`;
+        execFile('bash', ['-lc', any], { timeout: 8000 }, (e2, out2) => resolve(parsePorts(out2)));
+      });
+    }
   });
 }
 async function bestTarget(port) {
@@ -163,7 +178,7 @@ const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6
 const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13f';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13g';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

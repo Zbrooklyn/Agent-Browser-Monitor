@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13r';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13s';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -805,10 +805,17 @@ const MANIFEST = JSON.stringify({
     { name: 'All browsers', short_name: 'Grid', url: '/' }
   ]
 });
-// network pass-through SW (no content caching). BUILD (defined up top) is the version — clients check for it every
-// 60s and auto-reload, the SW clears caches + navigates open clients on activate, so the PWA self-heals to the latest.
+// Network-FIRST service worker. BUILD is the version — clients check for it every 60s and auto-reload (controllerchange),
+// so navigations always fetch the latest HTML online (self-update intact). The shell is cached only as an OFFLINE
+// fallback: if the server is unreachable, the PWA still opens to the app (which then shows the "Reconnecting…" banner)
+// instead of a dead white screen. Live data/streams (/api/*) always bypass the cache.
 const SW_VER = BUILD;
-const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
+const SW = `const V='${SW_VER}';const SHELL='shell-'+V;const ASSETS=['/','/manifest.webmanifest','/icon-192.png','/icon-512.png','/icon-maskable-512.png'];
+self.addEventListener('install',e=>{e.waitUntil((async()=>{try{const c=await caches.open(SHELL);await c.addAll(ASSETS);}catch(_){}await self.skipWaiting();})());});
+self.addEventListener('activate',e=>{e.waitUntil((async()=>{for(const k of await caches.keys())if(k!==SHELL)await caches.delete(k);await self.clients.claim();})());});
+self.addEventListener('fetch',e=>{const req=e.request;if(req.method!=='GET')return;const url=new URL(req.url);if(url.pathname.indexOf('/api/')===0)return;
+  if(req.mode==='navigate'){e.respondWith((async()=>{try{return await fetch(req);}catch(_){const c=await caches.open(SHELL);return (await c.match('/'))||Response.error();}})());return;}
+  e.respondWith((async()=>{const c=await caches.open(SHELL);const hit=await c.match(req);if(hit)return hit;try{const r=await fetch(req);if(r&&r.ok)c.put(req,r.clone());return r;}catch(_){return hit||Response.error();}})());});`;
 
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];

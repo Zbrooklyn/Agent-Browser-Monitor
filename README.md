@@ -44,9 +44,24 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
   plus `/watch/a+b+c` for a chosen subset and `/embed/{slug}` for a wall display.
 - **Mobile-first** — designed to be lived in from a phone.
 
-## Quick start
+## Requirements
+
+- **Node.js 22+** — it uses the built-in `WebSocket` global to speak CDP (available
+  unflagged from Node 21; 22+ recommended). No other runtime.
+- **No dependencies** — nothing to `npm install`. It is a single `.cjs` file.
+- **Windows for auto-discovery (today).** Tiles are discovered by finding Chromium
+  remote-debugging ports via a PowerShell query, so the zero-config auto-discovery is
+  Windows-only right now. The server and streaming themselves are plain Node and run
+  anywhere — only the port-discovery step is Windows-specific. (Cross-platform discovery
+  is a small, isolated change in `discoverPorts()`; PRs welcome.)
+
+## Install
+
+No package manager and no build step — clone (or just download `grid.cjs`) and run it:
 
 ```bash
+git clone https://github.com/Zbrooklyn/Agent-Browser-Monitor.git
+cd Agent-Browser-Monitor
 node grid.cjs
 ```
 

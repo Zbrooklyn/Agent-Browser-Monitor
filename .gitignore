@@ -1,0 +1,19 @@
+# runtime logs
+*.log
+*.err
+
+# local dev / scratch
+viewport-check/
+mockup.html
+*.original.*
+
+# superseded single-session prototype + internal planning notes (kept local, not published)
+relay.cjs
+ROADMAP.md
+
+# node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

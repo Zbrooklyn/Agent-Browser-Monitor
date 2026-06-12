@@ -32,14 +32,23 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
 - **One multiplexed stream** — all tiles share a single Server-Sent-Events feed, so you
   are not capped by the browser's per-host connection limit no matter how many tiles.
 - **Focused high-res view** — tap a tile for a crisp 1080p+ stream: pinch-zoom, tap to
-  toggle the chrome away, rotate-to-fill, swipe between sessions, keyboard nav, and
-  one-tap save-frame.
+  toggle the chrome away, rotate-to-fill, swipe between sessions, keyboard nav, and an
+  overflow menu (pin, rename, copy link, save frame, fullscreen).
 - **Organize the grid** — drag to reorder (with a dedicated touch Reorder mode), pin
   favorites to the top, and rename sessions; your arrangement persists.
+- **Reliable streaming** — dropped CDP sockets auto-reconnect, a "Reconnecting…" banner
+  appears if the server blips (the grid stays up instead of flashing empty), and
+  backgrounded browser windows keep animating instead of freezing.
+- **Remembers everything** — your sort, columns, cover mode, *and your last view* persist
+  per device; reopen the app and you land right where you left off. Shared links still
+  override your saved defaults.
 - **Awareness** — per-session active / idle / stuck detection, plus a "needs you" badge
   when a browser lands on a login, captcha, or auth wall.
-- **Installable PWA** — add to the home screen, screen wake-lock, pull-to-refresh, and
-  offscreen tiles pause to save battery and bandwidth.
+- **Installable PWA, offline-aware** — add to the home screen, screen wake-lock,
+  pull-to-refresh, and offscreen tiles pause to save battery. Opens to the app (not a
+  blank page) when the server is unreachable, and self-updates to the latest build with
+  no reinstall.
+- **Settings** — mute "needs you" notifications, and a one-tap "Clear saved data".
 - **Shareable URLs** — every session gets a stable, human-readable link (`/wikipedia`),
   plus `/watch/a+b+c` for a chosen subset and `/embed/{slug}` for a wall display.
 - **Mobile-first** — designed to be lived in from a phone.
@@ -151,9 +160,12 @@ on the same tailnet.
 
 ## Roadmap
 
-- Interactive takeover: pause the agent, drive the browser yourself, hand back.
-- Multi-tab drill-in and multi-machine discovery.
-- Smoother streaming: higher frame rate, then real video / WebRTC.
+- **Multi-tab drill-in** — see and switch between a session's tabs, not just its active one.
+- **Real video streaming (WebRTC)** — smoother, higher-frame-rate than the JPEG screencast.
+- **Recording / clips** — capture a session to a short clip you can save.
+- **Interactive takeover** (future) — pause the agent, drive the browser yourself, hand back.
+
+Single-machine by design: it watches the box it runs on. Run one instance per machine.
 
 ## License
 

@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13s';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13t';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -326,6 +326,12 @@ body.reorder .tile .pin{display:none}
 body.reorder #donebar{display:block}
 #donebtn{background:var(--live);color:#06140b;font-weight:700;border:none;border-radius:999px;padding:13px 30px;font-size:15px;box-shadow:0 12px 34px #000b;cursor:pointer}
 #donebtn:active{transform:scale(.96)}
+/* one-time first-run tip */
+#hint{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:56;display:none;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;background:rgba(28,28,32,.95);backdrop-filter:blur(10px);border:1px solid var(--line2);box-shadow:0 12px 36px #000b}
+#hint.show{display:flex}
+#hint span{flex:1;font-size:12.8px;line-height:1.45;color:#cfcfd6}
+#hintok{flex:0 0 auto;border:none;border-radius:9px;background:var(--live);color:#06210d;font-size:13px;font-weight:700;padding:9px 16px;cursor:pointer}
+#hintok:active{transform:scale(.96)}
 .tile .sk{position:absolute;inset:0;background:linear-gradient(100deg,#161619 30%,#202026 50%,#161619 70%);background-size:220% 100%;animation:shim 1.25s linear infinite}
 @keyframes shim{0%{background-position:120% 0}100%{background-position:-120% 0}}
 .tile.ready .sk{display:none}
@@ -425,6 +431,7 @@ body.embed #focus{display:block}
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
+<div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
 <div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
 <div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
@@ -757,6 +764,12 @@ let wl=null;async function lockWake(){try{if('wakeLock' in navigator&&!document.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)lockWake();});
 // ask for notification permission + wake lock on the first interaction (browsers require a gesture)
 addEventListener('pointerdown',function once(){if(notifOn&&'Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});lockWake();removeEventListener('pointerdown',once);},{once:true});
+
+// one-time first-run tip (re-appears after "Clear saved data" since it clears 'seenhint')
+const hint=document.getElementById('hint'),hintok=document.getElementById('hintok');
+hintok.onclick=()=>{hint.classList.remove('show');try{localStorage.setItem('seenhint','1');}catch(_){}};
+(function(){let seen=true;try{seen=!!localStorage.getItem('seenhint');}catch(_){}if(seen||embed)return;
+  setTimeout(()=>{if(!focus.classList.contains('on')&&!document.body.classList.contains('select')&&!document.body.classList.contains('reorder'))hint.classList.add('show');},1000);})();
 
 // pull-to-refresh: PWA standalone kills the native gesture, so own it on the grid — re-poll + reconnect the stream
 (function(){

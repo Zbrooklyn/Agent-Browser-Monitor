@@ -267,13 +267,12 @@ body.embed #top{display:none!important}
 body.fit-cover .tile img,body.fit-cover #fimg{object-fit:cover}
 /* hold-to-reorder: lifted tile follows the finger; others dim; page scroll locked during the drag */
 body.dragging{touch-action:none}
-body.dragging .tile{transition:none}
-body.dragging #grid .tile:not(.drag){opacity:.5}
+body.dragging #grid .tile:not(.drag):not(.ph){opacity:.55}         /* displaced tiles keep their transition so the FLIP slide animates */
 .tile.drag{position:fixed;margin:0;opacity:.96;transform:scale(1.03);box-shadow:0 18px 44px #000e;z-index:60;border-color:var(--live)!important;transition:none;will-change:left,top}
+.tile.ph{background:#2ecc4012;border:2px dashed var(--live);box-shadow:none}   /* the gap that opens where the tile will drop */
+.tile.ph>*{display:none}
 /* reorder mode: tiles own the touch from the start (touch-action:none) so a drag never fights page-scroll; tap-to-open is disabled */
 body.reorder #grid .tile{touch-action:none;outline:2px dashed #ffffff3a;outline-offset:-3px;cursor:grab}
-body.reorder #grid .tile:not(.drag){animation:rwob .5s ease-in-out infinite alternate}
-@keyframes rwob{from{transform:rotate(-.45deg)}to{transform:rotate(.45deg)}}
 body.reorder .tile .pin{display:none}
 #donebar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));z-index:58;display:none}
 body.reorder #donebar{display:block}
@@ -520,8 +519,11 @@ function setupDrag(el,id){let lp=null,on=false,sx=0,sy=0,cx=0,cy=0,pend=false,pi
   const end=()=>{clearTimeout(lp);pend=false;if(on){on=false;endDrag();}};
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
 let dragOX=0,dragOY=0;                                          // pointer offset inside the lifted tile
+let dragPh=null,dragLastIdx=-1;                                  // placeholder element + last insertion index
 function beginDrag(id,px,py){dragId=id;document.body.classList.add('dragging');const x=tiles.get(id);if(!x)return;const el=x.el;
   const r=el.getBoundingClientRect();dragOX=px-r.left;dragOY=py-r.top;                  // lock the grab point so the tile sits under the finger
+  dragPh=document.createElement('div');dragPh.className='tile ph';dragPh.style.order=el.style.order||order.indexOf(id);grid.appendChild(dragPh); // reserve the slot in-flow so the others slide to open a gap
+  dragLastIdx=-1;
   el.style.width=r.width+'px';el.style.height=r.height+'px';el.style.left=r.left+'px';el.style.top=r.top+'px';el.classList.add('drag');}
 let dragRAF=0,dragPX=0,dragPY=0;
 function moveDrag(px,py){dragPX=px;dragPY=py;const x=tiles.get(dragId);if(x){x.el.style.left=(px-dragOX)+'px';x.el.style.top=(py-dragOY)+'px';}dragOver(px,py);if(!dragRAF)dragRAF=requestAnimationFrame(edgeTick);}
@@ -530,14 +532,29 @@ function edgeTick(){if(!dragId){dragRAF=0;return;}                  // auto-scro
   if(dragPY<EZ)v=-Math.ceil((EZ-dragPY)/EZ*MAX);else if(dragPY>h-EZ)v=Math.ceil((dragPY-(h-EZ))/EZ*MAX);
   if(v){const before=scrollY;scrollBy(0,v);if(scrollY!==before){const x=tiles.get(dragId);if(x){x.el.style.left=(dragPX-dragOX)+'px';x.el.style.top=(dragPY-dragOY)+'px';}dragOver(dragPX,dragPY);}else v=0;}
   dragRAF=v?requestAnimationFrame(edgeTick):0;}
-function dragOver(x,y){if(!dragId)return;const dx=tiles.get(dragId),el0=dx&&dx.el;       // hide the lifted tile from the hit-test so we read the tile underneath
-  const pe=el0?el0.style.pointerEvents:'';if(el0)el0.style.pointerEvents='none';
-  const el=document.elementFromPoint(x,y);if(el0)el0.style.pointerEvents=pe;
-  if(!el)return;const tile=el.closest('.tile');if(!tile||!tile.dataset.id||tile.dataset.id===dragId)return;
-  const from=order.indexOf(dragId),to=order.indexOf(tile.dataset.id);if(from<0||to<0)return;
-  order.splice(to,0,order.splice(from,1)[0]);order.forEach((sid,i)=>{const tt=tiles.get(sid);if(tt)tt.el.style.order=i;});}
+// Deterministic insertion by tile CENTER (reading order). Moving the placeholder makes the real tiles slide to
+// open a gap, animated with FLIP. Crossing a center (~half a tile) is required to change slots → no jitter oscillation.
+function dragOver(x,y){if(!dragId||!dragPh)return;
+  const others=order.filter(id=>id!==dragId);
+  let idx=others.length;
+  for(let i=0;i<others.length;i++){const t=tiles.get(others[i]);if(!t)continue;
+    const r=t.el.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    if(y<cy-4||(y<=r.bottom&&x<cx-4)){idx=i;break;}}            // first tile whose center is past the finger
+  if(idx===dragLastIdx)return;                                   // slot unchanged → no DOM churn, no flicker
+  dragLastIdx=idx;
+  const movers=others.map(id=>tiles.get(id)).filter(Boolean);
+  const first=movers.map(t=>[t,t.el.getBoundingClientRect()]);   // FLIP: capture before
+  for(let i=0;i<others.length;i++){const t=tiles.get(others[i]);if(t)t.el.style.order=(i<idx?i:i+1);} // open the gap at idx
+  dragPh.style.order=idx;
+  order=others.slice();order.splice(idx,0,dragId);               // keep the data model in sync for persistence
+  for(const [t,a] of first){const b=t.el.getBoundingClientRect(),mx=a.left-b.left,my=a.top-b.top;  // FLIP: animate the slide
+    if(!mx&&!my)continue;
+    t.el.style.transition='none';t.el.style.transform='translate('+mx+'px,'+my+'px)';
+    void t.el.offsetWidth;t.el.style.transition='transform .16s ease';t.el.style.transform='';}}
 function endDrag(){if(dragRAF){cancelAnimationFrame(dragRAF);dragRAF=0;}const x=tiles.get(dragId);if(x){x.el.classList.remove('drag');const s=x.el.style;s.width=s.height=s.left=s.top=s.pointerEvents='';}
-  document.body.classList.remove('dragging');dragId=null;lastDragEnd=Date.now();
+  if(dragPh){dragPh.remove();dragPh=null;}
+  order.forEach((sid,i)=>{const tt=tiles.get(sid);if(tt){const s=tt.el.style;s.order=i;s.transition='';s.transform='';}}); // settle final order, clear FLIP
+  document.body.classList.remove('dragging');dragId=null;dragLastIdx=-1;lastDragEnd=Date.now();
   customOrder=order.slice();try{localStorage.setItem('order',JSON.stringify(customOrder));}catch(_){}}
 function toggleSel(id){const x=tiles.get(id);if(!x)return;if(selSet.has(id)){selSet.delete(id);x.el.classList.remove('sel');}else{selSet.add(id);x.el.classList.add('sel');}watchn.textContent=selSet.size;watchfab.classList.toggle('show',selSet.size>0);}
 function removeTile(id){const x=tiles.get(id);if(x){io.unobserve(x.el);x.el.remove();tiles.delete(id);}}
@@ -674,7 +691,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12h';
+const SW_VER = '2026-06-12i';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

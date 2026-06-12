@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-14b';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-14c';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -746,11 +746,17 @@ filterbtn.onclick=toggleSheet;
 scrim.onclick=closeSheet;                                                   // tap the dimmed backdrop to dismiss
 document.addEventListener('click',e=>{if(optmenu.classList.contains('open')&&!optmenu.contains(e.target)&&!optbtn.contains(e.target)&&!filterbtn.contains(e.target))closeSheet();});
 // swipe the grab handle down to dismiss (mobile bottom-sheet gesture); release past ~90px commits, else it springs back
-(function(){const grip=document.getElementById('sheetgrip');let sy=0,dy=0,drag=false;
-  grip.addEventListener('pointerdown',e=>{drag=true;sy=e.clientY;dy=0;optmenu.classList.add('dragging');grip.setPointerCapture(e.pointerId);});
-  grip.addEventListener('pointermove',e=>{if(!drag)return;dy=Math.max(0,e.clientY-sy);optmenu.style.transform='translateY('+dy+'px)';});
-  function end(){if(!drag)return;drag=false;optmenu.classList.remove('dragging');if(dy>90)closeSheet();else optmenu.style.transform='';}
-  grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);})();
+// Swipe down anywhere on the sheet to dismiss. A drag only begins after ~8px of
+// downward movement, so taps on rows still register; armed only when the sheet is
+// scrolled to its top so it never fights native scroll on a short viewport.
+(function(){let sy=0,dy=0,armed=false,drag=false,pid=null;
+  optmenu.addEventListener('pointerdown',e=>{if(optmenu.scrollTop>0)return;sy=e.clientY;dy=0;armed=true;drag=false;pid=e.pointerId;});
+  optmenu.addEventListener('pointermove',e=>{if(!armed||e.pointerId!==pid)return;dy=e.clientY-sy;
+    if(dy<=0){if(!drag)armed=false;return;}
+    if(!drag&&dy>8){drag=true;optmenu.classList.add('dragging');try{optmenu.setPointerCapture(pid);}catch(_){}}
+    if(drag){e.preventDefault();optmenu.style.transform='translateY('+dy+'px)';}},{passive:false});
+  function end(){if(!armed)return;armed=false;if(drag){drag=false;optmenu.classList.remove('dragging');if(dy>90)closeSheet();else optmenu.style.transform='';}}
+  optmenu.addEventListener('pointerup',end);optmenu.addEventListener('pointercancel',end);})();
 [...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.onclick=()=>{const v=r.dataset.sort;if(v){params.set('sort',v);savePref('sort',v);}else{params.delete('sort');savePref('sort','');}history.replaceState({},'',location.pathname+qstr());applyGrid();syncBar();});
 fitrow.onclick=()=>{const on=!document.body.classList.contains('fit-cover');document.body.classList.toggle('fit-cover',on);if(on){params.set('fit','cover');savePref('fit','cover');}else{params.delete('fit');savePref('fit','');}history.replaceState({},'',location.pathname+qstr());syncBar();};
 activerow.onclick=()=>{closeSheet();nav('/active');};

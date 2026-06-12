@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13q';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13r';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -297,6 +297,11 @@ body.embed #top{display:none!important}
 #lay button:hover{color:#d4d4da}
 #lay button.on{background:var(--live);color:#06210d}
 #grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+/* connection-state strip: slides down over the top when the live feed drops */
+#netbanner{position:fixed;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;justify-content:center;gap:8px;padding:calc(7px + env(safe-area-inset-top)) 12px 7px;background:#e0a44e;color:#241400;font-size:12.5px;font-weight:700;letter-spacing:.01em;transform:translateY(-115%);transition:transform .24s ease;pointer-events:none}
+#netbanner.show{transform:none}
+.nspin{width:13px;height:13px;border:2px solid #2414003d;border-top-color:#241400;border-radius:50%;animation:nspin .7s linear infinite}
+@keyframes nspin{to{transform:rotate(360deg)}}
 /* custom pull-to-refresh (PWA standalone suppresses the native gesture) */
 #ptr{position:fixed;top:calc(env(safe-area-inset-top) - 6px);left:50%;transform:translate(-50%,0);z-index:40;width:38px;height:38px;border-radius:50%;background:#1c1c20;border:1px solid var(--line2);box-shadow:0 4px 16px #000a;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:transform .18s ease,opacity .15s}
 #ptr svg{width:20px;height:20px;fill:none;stroke:var(--muted);stroke-width:2.4;stroke-linecap:round}
@@ -416,6 +421,7 @@ body.embed #focus{display:block}
 <header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
 <div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
+<div id="netbanner"><span class="nspin"></span><span>Reconnecting…</span></div>
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
@@ -449,8 +455,17 @@ function nameOf(s){return names[s.id]||decodeEntities(s.title||s.id);}
 function domainOf(u){try{const x=new URL(u);return x.hostname.replace(/^www\\./,'')+(x.pathname.replace(/\\/$/,'')||'');}catch{return u||'';}}
 
 // ---------- multiplexed tile feed (ONE connection) ----------
+// connection state: a debounced "Reconnecting…" strip when the live feed/server drops (EventSource auto-retries)
+const netbanner=document.getElementById('netbanner');
+let netTimer=null,netDown=false;
+function netStatus(ok){
+  if(ok){netDown=false;if(netTimer){clearTimeout(netTimer);netTimer=null;}netbanner.classList.remove('show');}
+  else if(!netDown&&!netTimer){netTimer=setTimeout(()=>{netDown=true;netTimer=null;netbanner.classList.add('show');},1500);} // only surface a sustained drop
+}
 function openFeed(){ if(feedES)return; feedES=new EventSource('/api/feed');
-  feedES.onmessage=e=>{if(dragId)return;                          // freeze stream repaints during a drag so JPEG decode doesn't fight the gesture on the main thread
+  feedES.onopen=()=>netStatus(true);
+  feedES.onerror=()=>netStatus(false);                            // EventSource is auto-reconnecting under the hood
+  feedES.onmessage=e=>{netStatus(true);if(dragId)return;          // freeze stream repaints during a drag so JPEG decode doesn't fight the gesture on the main thread
     const i=e.data.indexOf('\\t');if(i<0)return;const id=e.data.slice(0,i),data=e.data.slice(i+1);
     const t=tiles.get(id); if(t&&t.visible){t.img.src='data:image/jpeg;base64,'+data;t.el.classList.add('ready');}}; }
 function closeFeed(){ if(feedES){feedES.close();feedES=null;} }
@@ -656,7 +671,9 @@ function applyGrid(){
 }
 
 // ---------- poll session list ----------
-async function poll(){let list=[];try{list=await(await fetch('/api/sessions')).json();}catch{}
+async function poll(){let list=null;try{list=await(await fetch('/api/sessions')).json();}catch{}
+  if(list===null){netStatus(false);return;}   // server unreachable → keep the last good grid up + show the banner, don't flash empty
+  netStatus(true);
   all=list;
   const liveN=list.filter(s=>s.live).length;cnum.textContent=liveN;hdot.classList.toggle('live',liveN>0);
   const needN=list.filter(s=>s.needs).length;neednEl.textContent=needN;needsEl.classList.toggle('on',needN>0);

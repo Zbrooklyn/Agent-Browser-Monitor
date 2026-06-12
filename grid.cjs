@@ -163,7 +163,7 @@ const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6
 const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13c';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13d';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -403,7 +403,8 @@ function domainOf(u){try{const x=new URL(u);return x.hostname.replace(/^www\\./,
 
 // ---------- multiplexed tile feed (ONE connection) ----------
 function openFeed(){ if(feedES)return; feedES=new EventSource('/api/feed');
-  feedES.onmessage=e=>{const i=e.data.indexOf('\\t');if(i<0)return;const id=e.data.slice(0,i),data=e.data.slice(i+1);
+  feedES.onmessage=e=>{if(dragId)return;                          // freeze stream repaints during a drag so JPEG decode doesn't fight the gesture on the main thread
+    const i=e.data.indexOf('\\t');if(i<0)return;const id=e.data.slice(0,i),data=e.data.slice(i+1);
     const t=tiles.get(id); if(t&&t.visible){t.img.src='data:image/jpeg;base64,'+data;t.el.classList.add('ready');}}; }
 function closeFeed(){ if(feedES){feedES.close();feedES=null;} }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden)closeFeed(); else openFeed(); });

@@ -11,7 +11,13 @@ any one for a high-resolution focused stream.
 > **Watch-only today.** It streams what the browsers are doing; it does not control them.
 > Interactive takeover is on the roadmap.
 
-<!-- TODO: hero screenshot / demo GIF -->
+![Agent Browsers — watch a fleet of AI-driven browsers live from one dashboard](docs/hero-desktop.png)
+
+<p align="center">
+  <img src="docs/hero-mobile.png" width="300" alt="Agent Browsers running as a phone PWA">
+  <br>
+  <em>…and the same dashboard, lived in from your phone.</em>
+</p>
 
 ## Why
 
@@ -25,8 +31,11 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
   tile. Launch a browser, it appears; close it, it goes away.
 - **One multiplexed stream** — all tiles share a single Server-Sent-Events feed, so you
   are not capped by the browser's per-host connection limit no matter how many tiles.
-- **Focused high-res view** — tap a tile for a crisp 1080p+ stream, with pinch-zoom,
-  swipe between sessions, keyboard nav, and one-tap save-frame.
+- **Focused high-res view** — tap a tile for a crisp 1080p+ stream: pinch-zoom, tap to
+  toggle the chrome away, rotate-to-fill, swipe between sessions, keyboard nav, and
+  one-tap save-frame.
+- **Organize the grid** — drag to reorder (with a dedicated touch Reorder mode), pin
+  favorites to the top, and rename sessions; your arrangement persists.
 - **Awareness** — per-session active / idle / stuck detection, plus a "needs you" badge
   when a browser lands on a login, captcha, or auth wall.
 - **Installable PWA** — add to the home screen, screen wake-lock, pull-to-refresh, and
@@ -97,12 +106,11 @@ node grid.cjs [host] [port]
   `tailscale serve` is the recommended private option. **Do not put it on the public
   internet** — the stream has no authentication.
 
-## Roadmap (v2)
+## Roadmap
 
-- Smoother streaming (higher frame rate, then real video).
 - Interactive takeover: pause the agent, drive the browser yourself, hand back.
-- Immersive single-view: tap to toggle chrome, fill-screen rotate, richer page context.
 - Multi-tab drill-in and multi-machine discovery.
+- Smoother streaming: higher frame rate, then real video / WebRTC.
 
 ## License
 

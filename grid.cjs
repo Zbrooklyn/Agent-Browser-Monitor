@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13y';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13z';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -423,14 +423,16 @@ body.embed #focus{display:block}
   .showseg button{height:44px}                            /* thumb-sized filter buttons in the sheet */
   .miniseg button{width:44px;height:40px}
   .mob{display:block}.mrow.mob{display:flex}              /* reveal Show + Select sections in the sheet */
-  #optmenu{position:fixed;left:0;right:0;bottom:0;top:auto;min-width:0;border-radius:18px 18px 0 0;padding:0 10px calc(12px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .26s cubic-bezier(.22,1,.36,1);display:block;box-shadow:0 -10px 40px #000c;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #optmenu{position:fixed;left:0;right:0;bottom:0;top:auto;min-width:0;border-radius:18px 18px 0 0;padding:0 10px calc(10px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .26s cubic-bezier(.22,1,.36,1);display:block;box-shadow:0 -10px 40px #000c;max-height:92vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   #optmenu.open{transform:none}
   #optmenu.dragging{transition:none}
-  .sheetgrip{display:block;position:sticky;top:0;margin:0 -10px;padding:9px 0 5px;background:#16161a;z-index:1;cursor:grab;touch-action:none}
+  .sheetgrip{display:block;position:sticky;top:0;margin:0 -10px;padding:8px 0 4px;background:#16161a;z-index:1;cursor:grab;touch-action:none}
   .sheetgrip::before{content:"";display:block;width:38px;height:4px;border-radius:3px;background:#4a4a52;margin:0 auto}
   body.sheet-open #scrim{opacity:1;pointer-events:auto}
-  .mrow{padding:14px 12px;font-size:14px}
-  .msec{padding:11px 12px 5px}
+  .mrow{padding:9px 12px;font-size:14px}
+  .msec{padding:7px 12px 3px}
+  #optmenu .msep{margin:3px 0}
+  #buildtag{padding-top:4px}
 }
 /* respect reduced-motion: kill the pulses/spinners/slides for users who ask for it */
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}

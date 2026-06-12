@@ -195,8 +195,10 @@ const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>';
+const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
+const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13p';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13q';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -259,7 +261,8 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .mrow.on .swt::after{transform:translateX(17px);background:#06210d}
 .mrow.on{color:var(--live);font-weight:650}  /* selected sort / active toggle row reads green + bold, not a faint check */
 .msep{height:1px;background:var(--line);margin:5px 8px}
-#buildtag{padding:5px 11px 3px;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);text-align:center;letter-spacing:.02em}
+.mrow.danger{color:#e3786f}      /* destructive action (Clear saved data) reads as a caution */
+#buildtag{padding:7px 11px 3px;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);text-align:center;letter-spacing:.02em}
 .mrow.rowflex{justify-content:space-between;cursor:default}
 .miniseg{display:inline-flex;background:#0e0e11;border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
 .miniseg button{width:36px;height:32px;border:none;border-radius:6px;background:transparent;color:var(--muted);font-weight:700;font-size:13px;cursor:pointer}
@@ -411,7 +414,7 @@ body.embed #focus{display:block}
 }
 </style></head><body>
 <header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
-<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div id="buildtag">build ${BUILD}</div></div></header>
+<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
@@ -431,6 +434,7 @@ const tiles=new Map(),meta=new Map(); let order=[],all=[];
 let customOrder=null;try{customOrder=JSON.parse(localStorage.getItem('order')||'null');}catch(_){}   // user's drag-reordered tile order
 let pins=new Set();try{pins=new Set(JSON.parse(localStorage.getItem('pins')||'[]'));}catch(_){}      // favorited tiles (sort to top)
 let dragId=null,lastDragEnd=0;
+let notifOn=(localStorage.getItem('notif')!=='0');   // Settings: mute "needs you" notifications (declared early — used in init + notify)
 let focusSlug=null,focusES=null,feedES=null,editing=false;
 let watch=null;            // array of slugs for /watch, else null
 let embed=false;           // /embed mode
@@ -698,6 +702,16 @@ document.addEventListener('click',e=>{if(!optmenu.contains(e.target)&&!optbtn.co
 fitrow.onclick=()=>{const on=!document.body.classList.contains('fit-cover');document.body.classList.toggle('fit-cover',on);if(on){params.set('fit','cover');savePref('fit','cover');}else{params.delete('fit');savePref('fit','');}history.replaceState({},'',location.pathname+qstr());syncBar();};
 activerow.onclick=()=>{optmenu.classList.remove('open');nav('/active');};
 document.getElementById('reloadrow').onclick=()=>{optmenu.classList.remove('open');buzz(15);location.reload();};   // hard reload: fresh fetch of app + latest build
+// Settings: mute/unmute "needs you" notifications (persisted)
+const notifrow=document.getElementById('notifrow');
+notifrow.classList.toggle('on',notifOn);
+notifrow.onclick=()=>{notifOn=!notifOn;try{localStorage.setItem('notif',notifOn?'1':'0');}catch(_){}notifrow.classList.toggle('on',notifOn);buzz(10);
+  if(notifOn&&'Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});};
+// Settings: wipe everything this device remembers, then start fresh
+document.getElementById('clearrow').onclick=()=>{optmenu.classList.remove('open');
+  if(!confirm('Clear all saved names, pins, tile order, preferences, and last view on this device?'))return;
+  ['order','pins','names','cols','route','pref_show','pref_sort','pref_fit','notif','seenhint'].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
+  buzz(20);location.href='/';};
 selbtn.onclick=()=>{if(reorderMode)setReorder(false);selectMode=!selectMode;document.body.classList.toggle('select',selectMode);selbtn.classList.toggle('on',selectMode);if(!selectMode){selSet.clear();[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));watchfab.classList.remove('show');}};
 selrow.onclick=()=>{optmenu.classList.remove('open');selbtn.onclick();};   // sheet Select row reuses the select toggle
 function setReorder(on){reorderMode=on;document.body.classList.toggle('reorder',on);buzz(on?20:8);}  // edit mode: tiles own the touch so drag-reorder never fights scroll
@@ -716,7 +730,7 @@ syncBar();
 let prevNeeds=new Set();
 function notify(list){
   const cur=new Set(list.filter(s=>s.needs).map(s=>s.id));
-  if('Notification' in window && Notification.permission==='granted'){
+  if(notifOn && 'Notification' in window && Notification.permission==='granted'){
     for(const s of list) if(s.needs && !prevNeeds.has(s.id)) try{new Notification('Needs you · '+(s.title||s.id),{body:domainOf(s.url),icon:'/icon-192.png',tag:s.id});}catch(_){}
   }
   prevNeeds=cur;
@@ -725,7 +739,7 @@ function notify(list){
 let wl=null;async function lockWake(){try{if('wakeLock' in navigator&&!document.hidden)wl=await navigator.wakeLock.request('screen');}catch(_){}}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)lockWake();});
 // ask for notification permission + wake lock on the first interaction (browsers require a gesture)
-addEventListener('pointerdown',function once(){if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});lockWake();removeEventListener('pointerdown',once);},{once:true});
+addEventListener('pointerdown',function once(){if(notifOn&&'Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});lockWake();removeEventListener('pointerdown',once);},{once:true});
 
 // pull-to-refresh: PWA standalone kills the native gesture, so own it on the grid — re-poll + reconnect the stream
 (function(){
@@ -754,12 +768,24 @@ poll();setInterval(poll,3000);
 </script></body></html>`;
 
 const MANIFEST = JSON.stringify({
-  name: 'Agent Browsers', short_name: 'Agents', start_url: '/', scope: '/',
-  display: 'standalone', background_color: '#0b0b0b', theme_color: '#0b0b0b', orientation: 'any',
+  name: 'Agent Browsers', short_name: 'Agents',
+  id: '/', start_url: '/', scope: '/', lang: 'en', dir: 'ltr',
+  description: 'Mission control for AI-driven browsers — watch a whole fleet of Playwright/CDP browsers live from your phone.',
+  display: 'standalone', display_override: ['standalone', 'minimal-ui'],
+  background_color: '#0b0b0b', theme_color: '#0b0b0b', orientation: 'any',
+  categories: ['productivity', 'utilities', 'developer'],
   icons: [
-    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+  ],
+  screenshots: [
+    { src: '/screenshot-wide.png', sizes: '1389x868', type: 'image/png', form_factor: 'wide', label: 'Live grid of agent browsers' },
+    { src: '/screenshot-narrow.png', sizes: '390x844', type: 'image/png', form_factor: 'narrow', label: 'Watch the fleet from your phone' }
+  ],
+  shortcuts: [
+    { name: 'Most active session', short_name: 'Active', url: '/active' },
+    { name: 'All browsers', short_name: 'Grid', url: '/' }
   ]
 });
 // network pass-through SW (no content caching). BUILD (defined up top) is the version — clients check for it every
@@ -796,6 +822,10 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/javascript', 'Service-Worker-Allowed': '/', 'Cache-Control': 'no-cache' }); res.end(SW);
   } else if (u === '/icon-192.png' || u === '/icon-512.png' || u === '/icon-maskable-512.png') {
     try { const b = fs.readFileSync(path.join(__dirname, u)); res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' }); res.end(b); }
+    catch { res.writeHead(404); res.end(); }
+  } else if (u === '/screenshot-wide.png' || u === '/screenshot-narrow.png') {
+    const file = u === '/screenshot-wide.png' ? 'hero-desktop.png' : 'hero-mobile.png';   // PWA install-card screenshots
+    try { const b = fs.readFileSync(path.join(__dirname, 'docs', file)); res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' }); res.end(b); }
     catch { res.writeHead(404); res.end(); }
   } else {
     // always revalidate the app shell so a server restart is picked up on the next load (the stream is online-only anyway)

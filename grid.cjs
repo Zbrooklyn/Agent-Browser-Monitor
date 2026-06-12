@@ -160,6 +160,7 @@ const ICOSLID = '<svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8
 const ICOFUN = '<svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>';
 const ICOROT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 9"/><path d="M3 21v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 15"/></svg>';
 const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.9l6.5-.9z"/></svg>';
+const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
@@ -307,8 +308,14 @@ body.select .pin,body.dragging .pin{display:none}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
 #back:active{background:#000d}
 #fid{display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;flex:1}
-#fname{font-weight:650;font-size:14.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;cursor:text}
+.fnamerow{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
+#fname{font-weight:650;font-size:14.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;cursor:text}
 #fname.editing{overflow:visible;outline:none;background:#ffffff1f;border-radius:6px;padding:1px 7px;box-shadow:0 0 0 1px #2ecc4088}
+#fpen{flex:0 0 auto;border:none;background:transparent;padding:0;margin:0;cursor:pointer;color:#fff;opacity:.4;display:flex;align-items:center;transition:opacity .15s}
+#fpen svg{width:12px;height:12px}
+#fpen:active{opacity:1}
+@media(hover:hover){.fnamerow:hover #fpen{opacity:.85}}
+#fname.editing + #fpen{display:none}
 .fsub{display:flex;align-items:center;gap:7px;min-width:0;max-width:100%}
 #fdom{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#9a9aa3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
 #ftime{font-size:11px;color:#9a9aa3;white-space:nowrap;flex:0 0 auto}
@@ -356,11 +363,11 @@ body.embed #focus{display:block}
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
-<div id="focus"><img id="fimg"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span id="fname" title="Tap to rename"></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fpin" class="fbtn glass" aria-label="Pin to top" title="Pin to top">${ICOSTAR}</button><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
+<div id="focus"><img id="fimg"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span id="fname" title="Tap to rename"></span><button id="fpen" aria-label="Rename" title="Tap to rename">${ICOPEN}</button></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fpin" class="fbtn glass" aria-label="Pin to top" title="Pin to top">${ICOSTAR}</button><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next');
-const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),ffs=document.getElementById('ffs'),fcopy=document.getElementById('fcopy'),fsave=document.getElementById('fsave'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fpin=document.getElementById('fpin');
+const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),ffs=document.getElementById('ffs'),fcopy=document.getElementById('fcopy'),fsave=document.getElementById('fsave'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fpin=document.getElementById('fpin'),fpen=document.getElementById('fpen');
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
 const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge');
 const selbtn=document.getElementById('selbtn'),optbtn=document.getElementById('optbtn'),optmenu=document.getElementById('optmenu'),fitrow=document.getElementById('fitrow'),activerow=document.getElementById('activerow'),selrow=document.getElementById('selrow'),watchfab=document.getElementById('watchfab'),watchn=document.getElementById('watchn');
@@ -436,10 +443,11 @@ fsave.onclick=e=>{e.stopPropagation();if(!fimg.src)return;const a=document.creat
 frot.onclick=e=>{e.stopPropagation();toggleRot();};
 fpin.onclick=e=>{e.stopPropagation();if(!focusSlug)return;togglePin(focusSlug);fpin.classList.toggle('on',pins.has(focusSlug));};
 fzap.onclick=e=>{e.stopPropagation();buzz();nav('/active');};
-// tap the title to rename the session (persists, feeds the tile name); Enter saves, Esc cancels, blank reverts
-fname.onclick=e=>{if(!focusSlug||editing)return;e.stopPropagation();editing=true;fname.contentEditable='true';fname.classList.add('editing');
+// tap the title (or pencil cue) to rename the session (persists, feeds the tile name); Enter saves, Esc cancels, blank reverts
+function startRename(e){if(!focusSlug||editing)return;if(e)e.stopPropagation();editing=true;fname.contentEditable='true';fname.classList.add('editing');
   fname.textContent=names[focusSlug]||(meta.get(focusSlug)||{}).title||focusSlug;fname.focus();
-  const r=document.createRange();r.selectNodeContents(fname);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);};
+  const r=document.createRange();r.selectNodeContents(fname);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);}
+fname.onclick=startRename;fpen.onclick=startRename;
 function commitRename(save){if(!editing)return;editing=false;fname.contentEditable='false';fname.classList.remove('editing');
   if(save){const v=fname.textContent.trim().replace(/\\s+/g,' ');if(v)names[focusSlug]=v;else delete names[focusSlug];try{localStorage.setItem('names',JSON.stringify(names));}catch(_){}}
   const s=all.find(x=>x.id===focusSlug),mm=meta.get(focusSlug);if(s&&mm)mm.title=nameOf(s);   // refresh meta so the bar shows the new name immediately
@@ -627,7 +635,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12c';
+const SW_VER = '2026-06-12d';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

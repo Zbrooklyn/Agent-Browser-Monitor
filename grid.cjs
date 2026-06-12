@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-14a';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-14b';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -249,7 +249,7 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 #optmenu{position:absolute;right:12px;top:calc(100% + 4px);min-width:208px;background:#16161a;border:1px solid var(--line2);border-radius:13px;padding:6px;box-shadow:0 16px 40px #000c;display:none;z-index:60}
 #optmenu.open{display:block}
 .sheetgrip{display:none}
-#scrim{position:fixed;inset:0;background:#000a;opacity:0;pointer-events:none;transition:opacity .22s ease;z-index:55}
+#scrim{position:fixed;inset:0;background:transparent;opacity:0;pointer-events:none;transition:opacity .18s ease;z-index:55}
 .msec{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:8px 11px 4px;font-weight:700}
 .mrow{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;color:#dcdce2;font-size:13px;font-weight:550;cursor:pointer;white-space:nowrap}
 .mrow:hover{background:#1f1f25}

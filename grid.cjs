@@ -177,8 +177,10 @@ const ICOROT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.9l6.5-.9z"/></svg>';
 const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
+const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13g';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13h';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -335,26 +337,30 @@ body.select .pin,body.dragging .pin{display:none}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
 #back:active{background:#000d}
-#fid{display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;flex:1}
-.fnamerow{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%}
-#fname{font-weight:650;font-size:14.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;cursor:text}
+#fid{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;flex:1}
+.fnamerow{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
+#fname{font-weight:650;font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;cursor:text;letter-spacing:.01em}
 #fname.editing{overflow:visible;outline:none;background:#ffffff1f;border-radius:6px;padding:1px 7px;box-shadow:0 0 0 1px #3ecf8e88}
-#fpen{flex:0 0 auto;border:none;background:transparent;padding:0;margin:0;cursor:pointer;color:#fff;opacity:.4;display:flex;align-items:center;transition:opacity .15s}
-#fpen svg{width:12px;height:12px}
-#fpen:active{opacity:1}
-@media(hover:hover){.fnamerow:hover #fpen{opacity:.85}}
-#fname.editing + #fpen{display:none}
-.fsub{display:flex;align-items:center;gap:7px;min-width:0;max-width:100%}
-#fdom{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#9a9aa3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
-#ftime{font-size:11px;color:#9a9aa3;white-space:nowrap;flex:0 0 auto}
+.fsub{display:flex;align-items:center;gap:7px;min-width:0;max-width:100%;padding-left:16px}
+#fdom{font:11.5px ui-monospace,SFMono-Regular,Consolas,monospace;color:#8b8b93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+#ftime{font-size:11px;color:#8b8b93;white-space:nowrap;flex:0 0 auto}
 #ftime.stuck{color:#e0a44e}
-#fdot{flex:0 0 auto}
-#fdot.active{background:var(--live);box-shadow:0 0 7px #3ecf8eaa;animation:pulse 1.9s ease-in-out infinite}
+#fdot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#9aa0a6}
+#fdot.active{background:var(--live);box-shadow:0 0 8px #3ecf8eaa;animation:pulse 1.9s ease-in-out infinite}
 #fdot.idle{background:#9aa0a6;box-shadow:none;animation:none}
 #fdot.stuck{background:#e0a44e;box-shadow:0 0 7px #e0a44e;animation:pulse 1.6s ease-in-out infinite}
 .fbtn{flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#fff;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .fbtn:active{background:#000d}
 .fbtn svg{width:18px;height:18px}
+/* overflow menu: secondary focus actions live here so the bar stays Back · title · rotate · ⋯ */
+#fmenu{position:absolute;top:calc(60px + env(safe-area-inset-top));right:13px;z-index:53;display:none;flex-direction:column;min-width:200px;padding:6px;border-radius:14px;box-shadow:0 14px 44px #000c}
+#fmenu.on{display:flex}
+#fmenu button{display:flex;align-items:center;gap:12px;width:100%;background:none;border:none;color:#e8e8ee;font-size:14.5px;font-weight:550;padding:11px 12px;border-radius:9px;cursor:pointer;text-align:left}
+#fmenu button:active{background:#ffffff16}
+#fmenu button svg{width:17px;height:17px;flex:0 0 auto;opacity:.9}
+#fmenu .pinrow svg{fill:currentColor;stroke:none;opacity:1}
+#fmenu .pinrow.on{color:#e8c66a}
+#fmenu .sep{height:1px;background:#ffffff14;margin:4px 8px;padding:0}
 #fnav{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:2px;align-items:center;border-radius:13px;padding:4px;z-index:52;transition:opacity .25s}
 #fnav button{width:48px;height:42px;border:none;background:transparent;color:#fff;font-size:21px;cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center}
 #fnav button:active{background:#ffffff22}
@@ -392,11 +398,11 @@ body.embed #focus{display:block}
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
-<div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span id="fname" title="Tap to rename"></span><button id="fpen" aria-label="Rename" title="Tap to rename">${ICOPEN}</button></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fpin" class="fbtn glass" aria-label="Pin to top" title="Pin to top">${ICOSTAR}</button><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
+<div id="focus"><img id="fimg" draggable="false"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next');
-const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),ffs=document.getElementById('ffs'),fcopy=document.getElementById('fcopy'),fsave=document.getElementById('fsave'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fpin=document.getElementById('fpin'),fpen=document.getElementById('fpen');
+const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fmore=document.getElementById('fmore'),fmenu=document.getElementById('fmenu');
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
 const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge');
 const selbtn=document.getElementById('selbtn'),optbtn=document.getElementById('optbtn'),optmenu=document.getElementById('optmenu'),fitrow=document.getElementById('fitrow'),activerow=document.getElementById('activerow'),selrow=document.getElementById('selrow'),watchfab=document.getElementById('watchfab'),watchn=document.getElementById('watchn');
@@ -434,8 +440,10 @@ function viewFocus(slug){
   if(params.get('full')==='1')requestFS();}
 function viewGrid(){focus.classList.remove('on','idle');if(focusES){focusES.close();focusES=null;}focusSlug=null;document.title='Agent Browsers';}
 function fmtAgo(ms){if(ms==null)return '';const s=Math.round(ms/1000);if(s<2)return 'live';if(s<60)return s+'s ago';const m=Math.round(s/60);if(m<60)return m+'m ago';return Math.round(m/60)+'h ago';}
-function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle';if(!editing)fname.textContent=m.title||focusSlug;
-  if(fpin)fpin.classList.toggle('on',pins.has(focusSlug));      // reflect pin state for the focused session
+// keep the focus-bar title tight: a page <title> like "Stripe | Financial Infrastructure…" shows as just "Stripe"
+function shortTitle(t){if(!t)return '';const p=t.split(/\\s[|\\u2013\\u2014\\u00b7-]\\s/)[0].trim();return p||t;}
+function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle';if(!editing)fname.textContent=shortTitle(m.title)||focusSlug;
+  const pr=fmenu&&fmenu.querySelector('.pinrow');if(pr)pr.classList.toggle('on',pins.has(focusSlug)); // reflect pin state in the menu
   fdom.textContent=m.url||'';                                  // full URL, not just the domain
   fdot.className='dot '+st;                                    // dot colored by live/idle/stuck state
   const ago=st==='active'?'live':(st==='stuck'?'stuck '+fmtAgo(m.lastChangeMs):fmtAgo(m.lastChangeMs));
@@ -468,24 +476,32 @@ prev.onclick=e=>{e.stopPropagation();step(-1);};next.onclick=e=>{e.stopPropagati
 function toggleChrome(){focus.classList.toggle('idle');buzz(8);}   // immersive: a tap on the image hides/shows ALL chrome (no auto-hide timer)
 function nativeFS(){return document.fullscreenElement||document.webkitFullscreenElement;}
 function requestFS(){const r=focus.requestFullscreen||focus.webkitRequestFullscreen;if(r){try{const p=r.call(focus);if(p&&p.catch)p.catch(()=>{});}catch(_){}}}
-ffs.onclick=e=>{e.stopPropagation();if(nativeFS()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}else requestFS();};
-fcopy.onclick=async e=>{e.stopPropagation();const url=location.origin+'/'+focusSlug;try{await navigator.clipboard.writeText(url);fcopy.style.color='#3ecf8e';setTimeout(()=>fcopy.style.color='',900);}catch(_){}};
-fsave.onclick=e=>{e.stopPropagation();if(!fimg.src)return;const a=document.createElement('a');a.href=fimg.src;a.download=(focusSlug||'frame')+'-'+Date.now()+'.jpg';document.body.appendChild(a);a.click();a.remove();fsave.style.color='#3ecf8e';setTimeout(()=>fsave.style.color='',900);};
+function doFullscreen(){if(nativeFS()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}else requestFS();}
+async function doCopy(){if(!focusSlug)return;const url=location.origin+'/'+focusSlug;try{await navigator.clipboard.writeText(url);buzz(12);}catch(_){}}
+function doSave(){if(!fimg.src)return;const a=document.createElement('a');a.href=fimg.src;a.download=(focusSlug||'frame')+'-'+Date.now()+'.jpg';document.body.appendChild(a);a.click();a.remove();buzz(12);}
+function closeFMenu(){fmenu.classList.remove('on');}
 frot.onclick=e=>{e.stopPropagation();toggleRot();};
-fpin.onclick=e=>{e.stopPropagation();if(!focusSlug)return;togglePin(focusSlug);fpin.classList.toggle('on',pins.has(focusSlug));};
+fmore.onclick=e=>{e.stopPropagation();fmenu.classList.toggle('on');};
+fmenu.onclick=e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();const act=b.dataset.act;closeFMenu();
+  if(act==='pin'){if(focusSlug){togglePin(focusSlug);syncFocusBar();}}
+  else if(act==='rename')startRename();
+  else if(act==='copy')doCopy();
+  else if(act==='save')doSave();
+  else if(act==='fs')doFullscreen();};
+addEventListener('click',e=>{if(fmenu.classList.contains('on')&&!(e.target.closest&&e.target.closest('#fmenu,#fmore')))closeFMenu();});
 fzap.onclick=e=>{e.stopPropagation();buzz();nav('/active');};
 // tap the title (or pencil cue) to rename the session (persists, feeds the tile name); Enter saves, Esc cancels, blank reverts
 function startRename(e){if(!focusSlug||editing)return;if(e)e.stopPropagation();editing=true;fname.contentEditable='true';fname.classList.add('editing');
   fname.textContent=names[focusSlug]||(meta.get(focusSlug)||{}).title||focusSlug;fname.focus();
   const r=document.createRange();r.selectNodeContents(fname);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);}
-fname.onclick=startRename;fpen.onclick=startRename;
+fname.onclick=startRename;
 function commitRename(save){if(!editing)return;editing=false;fname.contentEditable='false';fname.classList.remove('editing');
   if(save){const v=fname.textContent.trim().replace(/\\s+/g,' ');if(v)names[focusSlug]=v;else delete names[focusSlug];try{localStorage.setItem('names',JSON.stringify(names));}catch(_){}}
   const s=all.find(x=>x.id===focusSlug),mm=meta.get(focusSlug);if(s&&mm)mm.title=nameOf(s);   // refresh meta so the bar shows the new name immediately
   applyGrid();syncFocusBar();}
 fname.addEventListener('keydown',e=>{if(!editing)return;e.stopPropagation();if(e.key==='Enter'){e.preventDefault();commitRename(true);}else if(e.key==='Escape'){e.preventDefault();commitRename(false);}});
 fname.addEventListener('blur',()=>commitRename(true));
-addEventListener('keydown',e=>{if(!focus.classList.contains('on'))return;if(e.key==='Escape')nav('/');else if(e.key==='ArrowRight')step(1);else if(e.key==='ArrowLeft')step(-1);else if(e.key==='f')ffs.onclick(e);});
+addEventListener('keydown',e=>{if(!focus.classList.contains('on'))return;if(e.key==='Escape')nav('/');else if(e.key==='ArrowRight')step(1);else if(e.key==='ArrowLeft')step(-1);else if(e.key==='f')doFullscreen();});
 // our long-press IS the drag gesture — kill the browser's native long-press/right-click menu everywhere except text fields
 addEventListener('contextmenu',e=>{if(e.target&&e.target.closest&&e.target.closest('input,textarea,[contenteditable="true"]'))return;e.preventDefault();});
 

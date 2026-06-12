@@ -516,7 +516,7 @@ function setupDrag(el,id){let lp=null,on=false,sx=0,sy=0,cx=0,cy=0,pend=false,pi
     if(!pend)return;const d=Math.max(Math.abs(cx-sx),Math.abs(cy-sy));
     if(reorderMode){if(d>6){e.preventDefault();arm();}}                                   // reorder mode: arm on a small move, immediately
     else if(d>14){clearTimeout(lp);pend=false;}});                                        // moved before the long-press fired = scroll intent, let it go
-  const end=()=>{clearTimeout(lp);pend=false;if(on){on=false;endDrag();}};
+  const end=e=>{if(e&&on){dragPX=e.clientX;dragPY=e.clientY;}clearTimeout(lp);pend=false;if(on){on=false;endDrag();}}; // capture the exact release point
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
 let dragOX=0,dragOY=0;                                          // pointer offset inside the lifted tile
 let dragPh=null,dragLastIdx=-1;                                  // placeholder element + last insertion index
@@ -559,7 +559,8 @@ function dragOver(x,y){if(!dragId||!dragPh)return;
     if(!mx&&!my)continue;t.el.style.transition='none';t.el.style.transform='translate('+mx+'px,'+my+'px)';moved.push(t);}
   void grid.offsetWidth;                                         // …one reflow for all…
   for(const t of moved){t.el.style.transition='transform .16s ease';t.el.style.transform='';}}  // …then play them home
-function endDrag(){if(dragRAF){cancelAnimationFrame(dragRAF);dragRAF=0;}if(moveRAF){cancelAnimationFrame(moveRAF);moveRAF=0;}const x=tiles.get(dragId);if(x){x.el.classList.remove('drag');const s=x.el.style;s.width=s.height=s.left=s.top=s.pointerEvents='';}
+function endDrag(){if(dragId&&dragPh)dragOver(dragPX,dragPY);   // FINAL reorder at the real release point — the rAF throttle may have skipped the last move, which dropped tiles in the wrong slot
+  if(dragRAF){cancelAnimationFrame(dragRAF);dragRAF=0;}if(moveRAF){cancelAnimationFrame(moveRAF);moveRAF=0;}const x=tiles.get(dragId);if(x){x.el.classList.remove('drag');const s=x.el.style;s.width=s.height=s.left=s.top=s.pointerEvents='';}
   if(dragPh){dragPh.remove();dragPh=null;}
   order.forEach((sid,i)=>{const tt=tiles.get(sid);if(tt){const s=tt.el.style;s.order=i;s.transition='';s.transform='';}}); // settle final order, clear FLIP
   document.body.classList.remove('dragging');dragId=null;dragLastIdx=-1;lastDragEnd=Date.now();
@@ -699,7 +700,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12j';
+const SW_VER = '2026-06-12k';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

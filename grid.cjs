@@ -195,7 +195,7 @@ const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13k';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13m';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -251,7 +251,12 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 .mrow svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
 .mrow .ck{margin-left:auto;width:16px;height:16px;opacity:0}
 .mrow.on .ck{opacity:1;stroke:var(--live)}
-.mrow.on{color:#fff}
+/* boolean on/off switch — always visible so OFF is a state you can see, not a blank row */
+.swt{margin-left:auto;flex:0 0 auto;width:40px;height:23px;border-radius:999px;background:#33333b;position:relative;transition:background .18s}
+.swt::after{content:"";position:absolute;top:2.5px;left:2.5px;width:18px;height:18px;border-radius:50%;background:#8a8a93;transition:transform .18s,background .18s}
+.mrow.on .swt{background:var(--live)}
+.mrow.on .swt::after{transform:translateX(17px);background:#06210d}
+.mrow.on{color:var(--live);font-weight:650}  /* selected sort / active toggle row reads green + bold, not a faint check */
 .msep{height:1px;background:var(--line);margin:5px 8px}
 #buildtag{padding:5px 11px 3px;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--muted);text-align:center;letter-spacing:.02em}
 .mrow.rowflex{justify-content:space-between;cursor:default}
@@ -345,7 +350,7 @@ body.select .pin,body.dragging .pin{display:none}
 #fimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;touch-action:none;transform-origin:0 0;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
 /* fill-the-glass: rotate the view 90° (element takes swapped dims; applyZoom adds the rotate transform) */
 #focus.rot #fimg{inset:auto;top:50%;left:50%;width:100vh;height:100vw;transform-origin:center}
-.fbtn.on{color:var(--live)}
+.fbtn.on{color:var(--live);background:#3ecf8e26;box-shadow:inset 0 0 0 1px #3ecf8e66}
 #fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
@@ -405,7 +410,7 @@ body.embed #focus{display:block}
 }
 </style></head><body>
 <header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
-<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="ck">${ICOCHK}</span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="msep"></div><div id="buildtag">build ${BUILD}</div></div></header>
+<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="msep"></div><div id="buildtag">build ${BUILD}</div></div></header>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>

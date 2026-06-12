@@ -541,12 +541,13 @@ function edgeTick(){if(!dragId){dragRAF=0;return;}                  // auto-scro
 // instead of one per tile. Moving the placeholder slides the real tiles to open a gap (FLIP). Crossing a cell
 // center (~half a tile) is required to change slots → built-in hysteresis, no jitter oscillation.
 function dragOver(x,y){if(!dragId||!dragPh)return;
+  const px=x-dragOX+gTW/2,py=y-dragOY+gTH/2;                    // the lifted tile's CENTER (what the user sees), not the raw finger point
   const others=order.filter(id=>id!==dragId);
   const gr=grid.getBoundingClientRect();
-  let idx=others.length;
-  for(let i=0;i<others.length;i++){const row=(i/gCols)|0,col=i%gCols;
-    const cx=gr.left+gPadL+col*(gTW+gGap)+gTW/2,cy=gr.top+gPadT+row*(gTH+gGap)+gTH/2;
-    if(y<cy-4||(y<cy+gTH/2&&x<cx-4)){idx=i;break;}}            // first cell whose center is past the finger
+  let col=Math.round((px-(gr.left+gPadL+gTW/2))/(gTW+gGap));    // nearest cell to the tile center — symmetric (no off-by-one) and
+  let row=Math.round((py-(gr.top+gPadT+gTH/2))/(gTH+gGap));     // accounts for the placeholder occupying a cell
+  col=Math.max(0,Math.min(gCols-1,col));row=Math.max(0,row);
+  let idx=Math.max(0,Math.min(others.length,row*gCols+col));
   if(idx===dragLastIdx)return;                                   // slot unchanged → no DOM churn, no flicker
   dragLastIdx=idx;
   const movers=others.map(id=>tiles.get(id)).filter(Boolean);
@@ -700,7 +701,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12k';
+const SW_VER = '2026-06-13a';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

@@ -198,7 +198,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13x';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13y';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -248,6 +248,8 @@ input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:tex
 #tools button{width:32px;padding:0}
 #optmenu{position:absolute;right:12px;top:calc(100% + 4px);min-width:208px;background:#16161a;border:1px solid var(--line2);border-radius:13px;padding:6px;box-shadow:0 16px 40px #000c;display:none;z-index:60}
 #optmenu.open{display:block}
+.sheetgrip{display:none}
+#scrim{position:fixed;inset:0;background:#000a;backdrop-filter:blur(1px);opacity:0;pointer-events:none;transition:opacity .22s ease;z-index:55}
 .msec{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:8px 11px 4px;font-weight:700}
 .mrow{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;color:#dcdce2;font-size:13px;font-weight:550;cursor:pointer;white-space:nowrap}
 .mrow:hover{background:#1f1f25}
@@ -421,8 +423,12 @@ body.embed #focus{display:block}
   .showseg button{height:44px}                            /* thumb-sized filter buttons in the sheet */
   .miniseg button{width:44px;height:40px}
   .mob{display:block}.mrow.mob{display:flex}              /* reveal Show + Select sections in the sheet */
-  #optmenu{position:fixed;left:0;right:0;bottom:0;top:auto;min-width:0;border-radius:18px 18px 0 0;padding:8px 10px calc(12px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .22s ease;display:block;box-shadow:0 -10px 40px #000c}
+  #optmenu{position:fixed;left:0;right:0;bottom:0;top:auto;min-width:0;border-radius:18px 18px 0 0;padding:0 10px calc(12px + env(safe-area-inset-bottom));transform:translateY(110%);transition:transform .26s cubic-bezier(.22,1,.36,1);display:block;box-shadow:0 -10px 40px #000c;max-height:82vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
   #optmenu.open{transform:none}
+  #optmenu.dragging{transition:none}
+  .sheetgrip{display:block;position:sticky;top:0;margin:0 -10px;padding:9px 0 5px;background:#16161a;z-index:1;cursor:grab;touch-action:none}
+  .sheetgrip::before{content:"";display:block;width:38px;height:4px;border-radius:3px;background:#4a4a52;margin:0 auto}
+  body.sheet-open #scrim{opacity:1;pointer-events:auto}
   .mrow{padding:14px 12px;font-size:14px}
   .msec{padding:11px 12px 5px}
 }
@@ -431,7 +437,8 @@ body.embed #focus{display:block}
 :focus-visible{outline:2px solid var(--live);outline-offset:2px}
 </style></head><body>
 <header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" aria-label="Filter sessions by name" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
-<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
+<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="sheetgrip" id="sheetgrip"></div><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
+<div id="scrim"></div>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
 <div id="netbanner"><span class="nspin"></span><span>Reconnecting…</span></div>
 <main id="grid" role="main" aria-label="Agent browsers"></main>
@@ -445,7 +452,7 @@ const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
 const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fmore=document.getElementById('fmore'),fmenu=document.getElementById('fmenu');
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
-const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge');
+const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge'),scrim=document.getElementById('scrim');
 const selbtn=document.getElementById('selbtn'),optbtn=document.getElementById('optbtn'),optmenu=document.getElementById('optmenu'),fitrow=document.getElementById('fitrow'),activerow=document.getElementById('activerow'),selrow=document.getElementById('selrow'),watchfab=document.getElementById('watchfab'),watchn=document.getElementById('watchn');
 const reorderrow=document.getElementById('reorderrow'),donebtn=document.getElementById('donebtn');
 let selectMode=false,reorderMode=false; const selSet=new Set();
@@ -726,29 +733,40 @@ function syncBar(){const show=params.get('show')||'';[...document.querySelectorA
   const sort=params.get('sort')||'';[...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.classList.toggle('on',(r.dataset.sort||'')===sort));
   fitrow.classList.toggle('on',params.get('fit')==='cover');}
 // filter chips + sheet Show buttons -> ?show (and exit /watch back to the grid); close the sheet after a sheet pick
-[...document.querySelectorAll('[data-show]')].forEach(c=>c.onclick=()=>{const v=c.dataset.show;if(v){params.set('show',v);savePref('show',v);}else{params.delete('show');savePref('show','');}nav('/');syncBar();optmenu.classList.remove('open');});
-// options sheet opens from either the desktop Options button or the mobile Filter button
-optbtn.onclick=e=>{e.stopPropagation();optmenu.classList.toggle('open');};
-filterbtn.onclick=e=>{e.stopPropagation();optmenu.classList.toggle('open');};
-document.addEventListener('click',e=>{if(!optmenu.contains(e.target)&&!optbtn.contains(e.target)&&!filterbtn.contains(e.target))optmenu.classList.remove('open');});
+[...document.querySelectorAll('[data-show]')].forEach(c=>c.onclick=()=>{const v=c.dataset.show;if(v){params.set('show',v);savePref('show',v);}else{params.delete('show');savePref('show','');}nav('/');syncBar();closeSheet();});
+// options sheet opens from either the desktop Options button or the mobile Filter button.
+// One open/close path so the scrim, body state, and any in-progress swipe always stay in sync.
+function openSheet(){optmenu.style.transform='';optmenu.classList.add('open');document.body.classList.add('sheet-open');}
+function closeSheet(){optmenu.classList.remove('open');document.body.classList.remove('sheet-open');optmenu.style.transform='';buzz(6);}
+function toggleSheet(e){if(e)e.stopPropagation();optmenu.classList.contains('open')?closeSheet():openSheet();}
+optbtn.onclick=toggleSheet;
+filterbtn.onclick=toggleSheet;
+scrim.onclick=closeSheet;                                                   // tap the dimmed backdrop to dismiss
+document.addEventListener('click',e=>{if(optmenu.classList.contains('open')&&!optmenu.contains(e.target)&&!optbtn.contains(e.target)&&!filterbtn.contains(e.target))closeSheet();});
+// swipe the grab handle down to dismiss (mobile bottom-sheet gesture); release past ~90px commits, else it springs back
+(function(){const grip=document.getElementById('sheetgrip');let sy=0,dy=0,drag=false;
+  grip.addEventListener('pointerdown',e=>{drag=true;sy=e.clientY;dy=0;optmenu.classList.add('dragging');grip.setPointerCapture(e.pointerId);});
+  grip.addEventListener('pointermove',e=>{if(!drag)return;dy=Math.max(0,e.clientY-sy);optmenu.style.transform='translateY('+dy+'px)';});
+  function end(){if(!drag)return;drag=false;optmenu.classList.remove('dragging');if(dy>90)closeSheet();else optmenu.style.transform='';}
+  grip.addEventListener('pointerup',end);grip.addEventListener('pointercancel',end);})();
 [...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.onclick=()=>{const v=r.dataset.sort;if(v){params.set('sort',v);savePref('sort',v);}else{params.delete('sort');savePref('sort','');}history.replaceState({},'',location.pathname+qstr());applyGrid();syncBar();});
 fitrow.onclick=()=>{const on=!document.body.classList.contains('fit-cover');document.body.classList.toggle('fit-cover',on);if(on){params.set('fit','cover');savePref('fit','cover');}else{params.delete('fit');savePref('fit','');}history.replaceState({},'',location.pathname+qstr());syncBar();};
-activerow.onclick=()=>{optmenu.classList.remove('open');nav('/active');};
-document.getElementById('reloadrow').onclick=()=>{optmenu.classList.remove('open');buzz(15);location.reload();};   // hard reload: fresh fetch of app + latest build
+activerow.onclick=()=>{closeSheet();nav('/active');};
+document.getElementById('reloadrow').onclick=()=>{closeSheet();buzz(15);location.reload();};   // hard reload: fresh fetch of app + latest build
 // Settings: mute/unmute "needs you" notifications (persisted)
 const notifrow=document.getElementById('notifrow');
 notifrow.classList.toggle('on',notifOn);
 notifrow.onclick=()=>{notifOn=!notifOn;try{localStorage.setItem('notif',notifOn?'1':'0');}catch(_){}notifrow.classList.toggle('on',notifOn);buzz(10);
   if(notifOn&&'Notification' in window&&Notification.permission==='default')Notification.requestPermission().catch(()=>{});};
 // Settings: wipe everything this device remembers, then start fresh
-document.getElementById('clearrow').onclick=()=>{optmenu.classList.remove('open');
+document.getElementById('clearrow').onclick=()=>{closeSheet();
   if(!confirm('Clear all saved names, pins, tile order, preferences, and last view on this device?'))return;
   ['order','pins','names','cols','route','pref_show','pref_sort','pref_fit','notif','seenhint'].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
   buzz(20);location.href='/';};
 selbtn.onclick=()=>{if(reorderMode)setReorder(false);selectMode=!selectMode;document.body.classList.toggle('select',selectMode);selbtn.classList.toggle('on',selectMode);if(!selectMode){selSet.clear();[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));watchfab.classList.remove('show');}};
-selrow.onclick=()=>{optmenu.classList.remove('open');selbtn.onclick();};   // sheet Select row reuses the select toggle
+selrow.onclick=()=>{closeSheet();selbtn.onclick();};   // sheet Select row reuses the select toggle
 function setReorder(on){reorderMode=on;document.body.classList.toggle('reorder',on);buzz(on?20:8);}  // edit mode: tiles own the touch so drag-reorder never fights scroll
-reorderrow.onclick=()=>{optmenu.classList.remove('open');if(selectMode)selbtn.onclick();setReorder(true);};
+reorderrow.onclick=()=>{closeSheet();if(selectMode)selbtn.onclick();setReorder(true);};
 donebtn.onclick=()=>setReorder(false);
 watchfab.onclick=()=>{if(!selSet.size)return;buzz(20);const set=[...selSet];selectMode=false;document.body.classList.remove('select');selbtn.classList.remove('on');watchfab.classList.remove('show');[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));nav('/watch/'+set.join('+'));};
 // collapsible search reflects to ?q

@@ -158,6 +158,8 @@ const ICOZAP = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path
 const ICOSRCH = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>';
 const ICOSLID = '<svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>';
 const ICOFUN = '<svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>';
+const ICOROT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 9"/><path d="M3 21v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 15"/></svg>';
+const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 18l-5.8 3 1.1-6.5L2.6 9.9l6.5-.9z"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
@@ -259,6 +261,11 @@ body.embed #top{display:none!important}
 .tile img{width:100%;height:100%;object-fit:contain;display:block;background:#000;opacity:0;transition:opacity .35s}
 .tile.ready img{opacity:1}
 body.fit-cover .tile img,body.fit-cover #fimg{object-fit:cover}
+/* hold-to-reorder: lifted tile follows the finger; others dim; page scroll locked during the drag */
+body.dragging{touch-action:none}
+body.dragging .tile{transition:none}
+body.dragging #grid .tile:not(.drag){opacity:.5}
+.tile.drag{opacity:.95;transform:scale(1.04);box-shadow:0 16px 40px #000d;z-index:6;border-color:var(--live)!important}
 .tile .sk{position:absolute;inset:0;background:linear-gradient(100deg,#161619 30%,#202026 50%,#161619 70%);background-size:220% 100%;animation:shim 1.25s linear infinite}
 @keyframes shim{0%{background-position:120% 0}100%{background-position:-120% 0}}
 .tile.ready .sk{display:none}
@@ -270,9 +277,15 @@ body.fit-cover .tile img,body.fit-cover #fimg{object-fit:cover}
 #needs{display:none;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;background:#e8a33d1f;border:1px solid #e8a33d66;color:#f0b860;font-size:12.5px;font-weight:650;cursor:pointer;text-decoration:none}
 #needs.on{display:inline-flex}
 #needs i{width:7px;height:7px;border-radius:50%;background:#e8a33d;box-shadow:0 0 7px #e8a33d;animation:pulse 1.6s ease-in-out infinite}
-.tile .tabs{position:absolute;top:9px;right:9px;display:none;gap:5px;align-items:center;padding:3px 8px 3px 7px;border-radius:999px;background:#000a;font-size:11.5px;font-weight:650;color:#d4d4da;font-variant-numeric:tabular-nums}
+.tile .tabs{position:absolute;top:9px;right:44px;display:none;gap:5px;align-items:center;padding:3px 8px 3px 7px;border-radius:999px;background:#000a;font-size:11.5px;font-weight:650;color:#d4d4da;font-variant-numeric:tabular-nums}
 .tile.multi .tabs{display:inline-flex}
 .tile .tabs svg{width:13px;height:13px;flex:0 0 auto;opacity:.85}
+/* pin / favorite: a subtle star top-right; gold when pinned; pinned tiles float to the top */
+.pin{position:absolute;top:8px;right:8px;width:30px;height:30px;border:none;border-radius:8px;background:#0007;color:#fff;opacity:.38;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:4;padding:0;transition:opacity .15s,color .15s}
+.pin svg{width:15px;height:15px;fill:currentColor;stroke:none}
+@media(hover:hover){.tile:hover .pin{opacity:.85}}
+.tile.pinned .pin{opacity:1;color:#e8c33d}
+body.select .pin,body.dragging .pin{display:none}
 .tile .lbl{position:absolute;left:0;right:0;bottom:0;padding:9px 11px 10px;background:linear-gradient(transparent,#000 92%);display:flex;flex-direction:column;gap:1px}
 .tile .t{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile .d{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#9a9aa3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -284,19 +297,31 @@ body.fit-cover .tile img,body.fit-cover #fimg{object-fit:cover}
 #focus{position:fixed;inset:0;background:#000;display:none;z-index:50}
 #focus.on{display:block}
 #fimg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;touch-action:none;transform-origin:0 0}
+/* fill-the-glass: rotate the view 90° (element takes swapped dims; applyZoom adds the rotate transform) */
+#focus.rot #fimg{inset:auto;top:50%;left:50%;width:100vh;height:100vw;transform-origin:center}
+.fbtn.on{color:var(--live)}
 #fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
 #back:active{background:#000d}
-#fid{display:flex;align-items:baseline;gap:9px;min-width:0;flex:1}
-#fname{font-weight:650;font-size:14.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
-#fdom{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#9a9aa3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto}
+#fid{display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;flex:1}
+#fname{font-weight:650;font-size:14.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;cursor:text}
+#fname.editing{overflow:visible;outline:none;background:#ffffff1f;border-radius:6px;padding:1px 7px;box-shadow:0 0 0 1px #2ecc4088}
+.fsub{display:flex;align-items:center;gap:7px;min-width:0;max-width:100%}
+#fdom{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#9a9aa3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+#ftime{font-size:11px;color:#9a9aa3;white-space:nowrap;flex:0 0 auto}
+#ftime.stuck{color:#e8a33d}
+#fdot{flex:0 0 auto}
+#fdot.active{background:var(--live);box-shadow:0 0 7px #2ecc40aa;animation:pulse 1.9s ease-in-out infinite}
+#fdot.idle{background:#9aa0a6;box-shadow:none;animation:none}
+#fdot.stuck{background:#e8a33d;box-shadow:0 0 7px #e8a33d;animation:pulse 1.6s ease-in-out infinite}
 .fbtn{flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#fff;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .fbtn:active{background:#000d}
 .fbtn svg{width:18px;height:18px}
 #fnav{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:2px;align-items:center;border-radius:13px;padding:4px;z-index:52;transition:opacity .25s}
-#fnav button{width:48px;height:42px;border:none;background:transparent;color:#fff;font-size:21px;cursor:pointer;border-radius:9px}
+#fnav button{width:48px;height:42px;border:none;background:transparent;color:#fff;font-size:21px;cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center}
 #fnav button:active{background:#ffffff22}
+#fzap svg{width:18px;height:18px;fill:currentColor;stroke:none}
 #flbl{color:#cfcfd6;font-size:12.5px;font-weight:600;padding:0 13px;min-width:54px;text-align:center;font-variant-numeric:tabular-nums}
 #focus.idle #fbar,#focus.idle #fnav{opacity:0;pointer-events:none}
 /* embed mode: chrome-less single stream */
@@ -329,23 +354,27 @@ body.embed #focus{display:block}
 <div id="grid"></div>
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="empty">${MARK}<h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div>
-<div id="focus"><img id="fimg"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="dot" id="fdot"></span><span id="fname"></span><span id="fdom"></span></div><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
+<div id="focus"><img id="fimg"><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span id="fname" title="Tap to rename"></span><span class="fsub"><span class="dot" id="fdot"></span><span id="fdom"></span><span id="ftime"></span></span></div><button id="fsave" class="fbtn glass" aria-label="Save frame" title="Save frame">${ICODL}</button><button id="fcopy" class="fbtn glass" aria-label="Copy link" title="Copy link">${ICOLINK}</button><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="ffs" class="fbtn glass" aria-label="Fullscreen" title="Fullscreen">&#x26F6;</button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next');
-const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ffs=document.getElementById('ffs'),fcopy=document.getElementById('fcopy'),fsave=document.getElementById('fsave');
+const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),ffs=document.getElementById('ffs'),fcopy=document.getElementById('fcopy'),fsave=document.getElementById('fsave'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap');
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
 const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge');
 const selbtn=document.getElementById('selbtn'),optbtn=document.getElementById('optbtn'),optmenu=document.getElementById('optmenu'),fitrow=document.getElementById('fitrow'),activerow=document.getElementById('activerow'),selrow=document.getElementById('selrow'),watchfab=document.getElementById('watchfab'),watchn=document.getElementById('watchn');
 let selectMode=false; const selSet=new Set();
 const tiles=new Map(),meta=new Map(); let order=[],all=[];
-let focusSlug=null,focusES=null,feedES=null;
+let customOrder=null;try{customOrder=JSON.parse(localStorage.getItem('order')||'null');}catch(_){}   // user's drag-reordered tile order
+let pins=new Set();try{pins=new Set(JSON.parse(localStorage.getItem('pins')||'[]'));}catch(_){}      // favorited tiles (sort to top)
+let dragId=null,lastDragEnd=0;
+let focusSlug=null,focusES=null,feedES=null,editing=false;
 let watch=null;            // array of slugs for /watch, else null
 let embed=false;           // /embed mode
 const params=new URLSearchParams(location.search);
 const _dec=document.createElement('textarea');
 function decodeEntities(s){if(!s||s.indexOf('&')<0)return s;_dec.innerHTML=s;return _dec.value;} // titles from CDP arrive HTML-encoded (e.g. &amp;)
-function nameOf(s){return decodeEntities(s.title||s.id);}
+let names={};try{names=JSON.parse(localStorage.getItem('names')||'{}');}catch(_){}   // user-given custom session names
+function nameOf(s){return names[s.id]||decodeEntities(s.title||s.id);}
 function domainOf(u){try{const x=new URL(u);return x.hostname.replace(/^www\\./,'')+(x.pathname.replace(/\\/$/,'')||'');}catch{return u||'';}}
 
 // ---------- multiplexed tile feed (ONE connection) ----------
@@ -359,12 +388,17 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden)closeFeed(
 const io=new IntersectionObserver(es=>{for(const e of es){const t=tiles.get(e.target.dataset.id);if(t)t.visible=e.isIntersecting;}},{root:null,rootMargin:'120px'});
 function viewFocus(slug){
   if(focusSlug===slug&&focus.classList.contains('on')){syncFocusBar();return;}
-  focusSlug=slug;focus.classList.add('on');resetZoom();syncFocusBar();armIdle();
+  focusSlug=slug;focus.classList.add('on');focus.classList.remove('idle');resetZoom();syncFocusBar();
   fimg.removeAttribute('src');if(focusES)focusES.close();
   focusES=new EventSource('/api/hq/'+slug);focusES.onmessage=e=>fimg.src='data:image/jpeg;base64,'+e.data;
   if(params.get('full')==='1')requestFS();}
-function viewGrid(){focus.classList.remove('on','idle');if(focusES){focusES.close();focusES=null;}focusSlug=null;clearTimeout(idleT);document.title='Agent Browsers';}
-function syncFocusBar(){const m=meta.get(focusSlug)||{};fname.textContent=m.title||focusSlug;fdom.textContent=domainOf(m.url);fdot.classList.toggle('live',!!m.live);
+function viewGrid(){focus.classList.remove('on','idle');if(focusES){focusES.close();focusES=null;}focusSlug=null;document.title='Agent Browsers';}
+function fmtAgo(ms){if(ms==null)return '';const s=Math.round(ms/1000);if(s<2)return 'live';if(s<60)return s+'s ago';const m=Math.round(s/60);if(m<60)return m+'m ago';return Math.round(m/60)+'h ago';}
+function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle';if(!editing)fname.textContent=m.title||focusSlug;
+  fdom.textContent=m.url||'';                                  // full URL, not just the domain
+  fdot.className='dot '+st;                                    // dot colored by live/idle/stuck state
+  const ago=st==='active'?'live':(st==='stuck'?'stuck '+fmtAgo(m.lastChangeMs):fmtAgo(m.lastChangeMs));
+  ftime.textContent=ago?('· '+ago):'';ftime.className=st==='stuck'?'stuck':'';
   const i=order.indexOf(focusSlug);flbl.textContent=order.length>1?((i+1)+' / '+order.length):'';prev.style.visibility=next.style.visibility=order.length>1?'':'hidden';
   document.title=(m.title?m.title.replace(/(?: · Agent Browsers)+$/,'')+' · ':'')+'Agent Browsers';} // strip repeats so a self-viewing session can't compound the title
 
@@ -390,32 +424,45 @@ function step(d){if(order.length<2)return;buzz();let i=order.indexOf(focusSlug);
 prev.onclick=e=>{e.stopPropagation();step(-1);};next.onclick=e=>{e.stopPropagation();step(1);};
 
 // ---------- focus chrome: idle-hide, fullscreen, copy-link ----------
-let idleT;function armIdle(){clearTimeout(idleT);focus.classList.remove('idle');idleT=setTimeout(()=>focus.classList.add('idle'),2800);}
-focus.addEventListener('pointermove',armIdle);
+function toggleChrome(){focus.classList.toggle('idle');buzz(8);}   // immersive: a tap on the image hides/shows ALL chrome (no auto-hide timer)
 function nativeFS(){return document.fullscreenElement||document.webkitFullscreenElement;}
 function requestFS(){const r=focus.requestFullscreen||focus.webkitRequestFullscreen;if(r){try{const p=r.call(focus);if(p&&p.catch)p.catch(()=>{});}catch(_){}}}
 ffs.onclick=e=>{e.stopPropagation();if(nativeFS()){(document.exitFullscreen||document.webkitExitFullscreen).call(document);}else requestFS();};
 fcopy.onclick=async e=>{e.stopPropagation();const url=location.origin+'/'+focusSlug;try{await navigator.clipboard.writeText(url);fcopy.style.color='#2ecc40';setTimeout(()=>fcopy.style.color='',900);}catch(_){}};
 fsave.onclick=e=>{e.stopPropagation();if(!fimg.src)return;const a=document.createElement('a');a.href=fimg.src;a.download=(focusSlug||'frame')+'-'+Date.now()+'.jpg';document.body.appendChild(a);a.click();a.remove();fsave.style.color='#2ecc40';setTimeout(()=>fsave.style.color='',900);};
+frot.onclick=e=>{e.stopPropagation();toggleRot();};
+fzap.onclick=e=>{e.stopPropagation();buzz();nav('/active');};
+// tap the title to rename the session (persists, feeds the tile name); Enter saves, Esc cancels, blank reverts
+fname.onclick=e=>{if(!focusSlug||editing)return;e.stopPropagation();editing=true;fname.contentEditable='true';fname.classList.add('editing');
+  fname.textContent=names[focusSlug]||(meta.get(focusSlug)||{}).title||focusSlug;fname.focus();
+  const r=document.createRange();r.selectNodeContents(fname);const sel=getSelection();sel.removeAllRanges();sel.addRange(r);};
+function commitRename(save){if(!editing)return;editing=false;fname.contentEditable='false';fname.classList.remove('editing');
+  if(save){const v=fname.textContent.trim().replace(/\\s+/g,' ');if(v)names[focusSlug]=v;else delete names[focusSlug];try{localStorage.setItem('names',JSON.stringify(names));}catch(_){}}
+  const s=all.find(x=>x.id===focusSlug),mm=meta.get(focusSlug);if(s&&mm)mm.title=nameOf(s);   // refresh meta so the bar shows the new name immediately
+  applyGrid();syncFocusBar();}
+fname.addEventListener('keydown',e=>{if(!editing)return;e.stopPropagation();if(e.key==='Enter'){e.preventDefault();commitRename(true);}else if(e.key==='Escape'){e.preventDefault();commitRename(false);}});
+fname.addEventListener('blur',()=>commitRename(true));
 addEventListener('keydown',e=>{if(!focus.classList.contains('on'))return;if(e.key==='Escape')nav('/');else if(e.key==='ArrowRight')step(1);else if(e.key==='ArrowLeft')step(-1);else if(e.key==='f')ffs.onclick(e);});
 
 // ---------- pinch-zoom + pan on focus image ----------
 function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms||10);}catch(_){}}
 let z=1,tx=0,ty=0,pts=new Map(),pinch=null,swipe=null,multi=false;
-function applyZoom(){fimg.style.transform='translate('+tx+'px,'+ty+'px) scale('+z+')';}
+function applyZoom(){fimg.style.transform=focus.classList.contains('rot')?('translate(-50%,-50%) rotate(90deg) scale('+z+')'):('translate('+tx+'px,'+ty+'px) scale('+z+')');}
 function resetZoom(){z=1;tx=0;ty=0;applyZoom();}
+function toggleRot(){focus.classList.toggle('rot');frot.classList.toggle('on',focus.classList.contains('rot'));resetZoom();buzz();}   // fill the glass: rotate the view 90° so a landscape page fills a portrait phone
 fimg.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{fimg.setPointerCapture(e.pointerId);}catch(_){}
   if(pts.size===1){swipe={x:e.clientX,y:e.clientY,t:Date.now()};multi=false;}
   if(pts.size===2){multi=true;const p=[...pts.values()];pinch={d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),z};}});
-fimg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;const prev=pts.get(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+fimg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;if(focus.classList.contains('rot'))return;const prev=pts.get(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size===2&&pinch){const p=[...pts.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);z=Math.max(1,Math.min(5,pinch.z*d/pinch.d));if(z===1){tx=0;ty=0;}applyZoom();}
   else if(pts.size===1&&z>1){tx+=e.clientX-prev.x;ty+=e.clientY-prev.y;applyZoom();}});
 function liftPtr(e){
   // single-finger flick on an un-zoomed image: ←/→ switch session, swipe-down closes
   if(pts.size===1&&!multi&&z===1&&swipe){const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y,dt=Date.now()-swipe.t;
-    if(dt<600&&Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.3){step(dx<0?1:-1);}
-    else if(dt<600&&dy>90&&dy>Math.abs(dx)){buzz();nav('/');}
-    else if(Math.abs(dx)<10&&Math.abs(dy)<10){armIdle();}}   // a tap reveals the auto-hidden chrome (touch can't fire pointermove)
+    if(Math.abs(dx)<10&&Math.abs(dy)<10){toggleChrome();}            // a tap toggles all chrome (works rotated too)
+    else if(!focus.classList.contains('rot')){                       // swipe nav/close only when not rotated
+      if(dt<600&&Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.3){step(dx<0?1:-1);}
+      else if(dt<600&&dy>90&&dy>Math.abs(dx)){buzz();nav('/');}}}
   pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(pts.size===0)swipe=null;}
 fimg.addEventListener('pointerup',liftPtr);fimg.addEventListener('pointercancel',liftPtr);
 fimg.addEventListener('dblclick',()=>{z>1?resetZoom():(z=2,applyZoom());});
@@ -423,17 +470,34 @@ fimg.addEventListener('dblclick',()=>{z>1?resetZoom():(z=2,applyZoom());});
 // ---------- tiles ----------
 function setTabs(x,n){x.tn.textContent=n;x.el.classList.toggle('multi',n>1);}
 function addTile(s){const el=document.createElement('div');el.className='tile';el.dataset.id=s.id;
-  el.innerHTML='<div class="sk"></div><img><div class="check">&#x2713;</div><span class="badge"><i></i><span class="bt">LIVE</span></span><span class="tabs">${ICOTAB}<span class="tn"></span></span><div class="lbl"><span class="t"></span><span class="d"></span></div>';
-  const img=el.querySelector('img'),t=el.querySelector('.t'),d=el.querySelector('.d'),tn=el.querySelector('.tn'),bt=el.querySelector('.bt');
-  t.textContent=nameOf(s);d.textContent=domainOf(s.url);el.onclick=()=>tileClick(s.id);
-  grid.appendChild(el);const x={el,img,t,d,tn,bt,visible:true};tiles.set(s.id,x);setTabs(x,s.tabs);if(selSet.has(s.id))el.classList.add('sel');io.observe(el);}
-function tileClick(id){buzz();if(selectMode)toggleSel(id);else openFocus(id);}
+  el.innerHTML='<div class="sk"></div><img><div class="check">&#x2713;</div><span class="badge"><i></i><span class="bt">LIVE</span></span><button class="pin" aria-label="Pin">${ICOSTAR}</button><span class="tabs">${ICOTAB}<span class="tn"></span></span><div class="lbl"><span class="t"></span><span class="d"></span></div>';
+  const img=el.querySelector('img'),t=el.querySelector('.t'),d=el.querySelector('.d'),tn=el.querySelector('.tn'),bt=el.querySelector('.bt'),pin=el.querySelector('.pin');
+  t.textContent=nameOf(s);d.textContent=domainOf(s.url);el.onclick=()=>tileClick(s.id);setupDrag(el,s.id);
+  pin.addEventListener('pointerdown',e=>e.stopPropagation());           // don't start a drag from the star
+  pin.onclick=e=>{e.stopPropagation();togglePin(s.id);};
+  grid.appendChild(el);const x={el,img,t,d,tn,bt,visible:true};tiles.set(s.id,x);setTabs(x,s.tabs);if(selSet.has(s.id))el.classList.add('sel');if(pins.has(s.id))el.classList.add('pinned');io.observe(el);}
+function togglePin(id){if(pins.has(id))pins.delete(id);else pins.add(id);try{localStorage.setItem('pins',JSON.stringify([...pins]));}catch(_){}const x=tiles.get(id);if(x)x.el.classList.toggle('pinned',pins.has(id));buzz(12);applyGrid();}
+function tileClick(id){if(Date.now()-lastDragEnd<350)return;buzz();if(selectMode)toggleSel(id);else openFocus(id);}
+// long-press a tile, then drag to reorder; the order persists and becomes the default ordering
+function setupDrag(el,id){let lp=null,on=false,sx=0,sy=0;
+  el.addEventListener('pointerdown',e=>{if(selectMode||focus.classList.contains('on'))return;sx=e.clientX;sy=e.clientY;on=false;
+    lp=setTimeout(()=>{on=true;beginDrag(id);buzz(20);try{el.setPointerCapture(e.pointerId);}catch(_){}},380);});
+  el.addEventListener('pointermove',e=>{if(!on){if(Math.abs(e.clientX-sx)>10||Math.abs(e.clientY-sy)>10)clearTimeout(lp);return;}e.preventDefault();dragOver(e.clientX,e.clientY);});
+  const end=()=>{clearTimeout(lp);if(on){on=false;endDrag();}};
+  el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
+function beginDrag(id){dragId=id;document.body.classList.add('dragging');const x=tiles.get(id);if(x)x.el.classList.add('drag');}
+function dragOver(x,y){if(!dragId)return;const el=document.elementFromPoint(x,y);if(!el)return;const tile=el.closest('.tile');if(!tile||!tile.dataset.id||tile.dataset.id===dragId)return;
+  const from=order.indexOf(dragId),to=order.indexOf(tile.dataset.id);if(from<0||to<0)return;
+  order.splice(to,0,order.splice(from,1)[0]);order.forEach((sid,i)=>{const tt=tiles.get(sid);if(tt)tt.el.style.order=i;});}
+function endDrag(){const x=tiles.get(dragId);if(x)x.el.classList.remove('drag');document.body.classList.remove('dragging');dragId=null;lastDragEnd=Date.now();
+  customOrder=order.slice();try{localStorage.setItem('order',JSON.stringify(customOrder));}catch(_){}}
 function toggleSel(id){const x=tiles.get(id);if(!x)return;if(selSet.has(id)){selSet.delete(id);x.el.classList.remove('sel');}else{selSet.add(id);x.el.classList.add('sel');}watchn.textContent=selSet.size;watchfab.classList.toggle('show',selSet.size>0);}
 function removeTile(id){const x=tiles.get(id);if(x){io.unobserve(x.el);x.el.remove();tiles.delete(id);}}
 function setState(x,s){x.el.classList.remove('state-active','state-idle','state-stuck');x.el.classList.add('state-'+(s.state||'idle'));x.el.classList.toggle('needs',!!s.needs);x.bt.textContent=s.state==='stuck'?'STUCK':s.state==='active'?'LIVE':'IDLE';}
 
 // ---------- which sessions to show (watch set + query filters + sort) ----------
 function applyGrid(){
+  if(dragId)return;                                            // don't reshuffle mid-drag
   const q=(params.get('q')||'').toLowerCase(),show=params.get('show'),sort=params.get('sort');
   let list=all.slice();
   if(watch)list=list.filter(s=>watch.includes(s.id));
@@ -444,10 +508,12 @@ function applyGrid(){
   else if(show==='needs')list=list.filter(s=>s.needs);
   if(sort==='name')list.sort((a,b)=>a.id.localeCompare(b.id));
   else if(sort==='newest')list.sort((a,b)=>b.port-a.port);
+  else if(customOrder){const ix=id=>{const i=customOrder.indexOf(id);return i<0?1e9:i;};list.sort((a,b)=>(ix(a.id)-ix(b.id))||((b.state==='active')-(a.state==='active')));} // user's drag order
   else list.sort((a,b)=>(b.state==='active')-(a.state==='active')); // default "Active first": stable partition, active on top
+  if(pins.size)list.sort((a,b)=>(pins.has(a.id)?0:1)-(pins.has(b.id)?0:1)); // favorites float to the top (stable, after any sort)
   const want=new Set(list.map(s=>s.id));
   for(const id of [...tiles.keys()])if(!want.has(id))removeTile(id);
-  for(const s of list){if(!tiles.has(s.id))addTile(s);const x=tiles.get(s.id);x.t.textContent=nameOf(s);x.d.textContent=domainOf(s.url);setState(x,s);setTabs(x,s.tabs);x.el.style.order=list.indexOf(s);}
+  for(const s of list){if(!tiles.has(s.id))addTile(s);const x=tiles.get(s.id);x.t.textContent=nameOf(s);x.d.textContent=domainOf(s.url);setState(x,s);setTabs(x,s.tabs);x.el.classList.toggle('pinned',pins.has(s.id));x.el.style.order=list.indexOf(s);}
   order=list.map(s=>s.id);
   empty.classList.toggle('on',list.length===0&&!focus.classList.contains('on'));
   grid.style.display=focus.classList.contains('on')?'none':(list.length===0?'none':'');
@@ -462,7 +528,7 @@ async function poll(){let list=[];try{list=await(await fetch('/api/sessions')).j
   filterbadge.textContent=needN;filterbadge.classList.toggle('on',needN>0);
   filterbtn.setAttribute('aria-label',needN>0?(needN+' need you · filter & options'):'Filter & options');
   notify(list);
-  meta.clear();for(const s of list)meta.set(s.id,{title:nameOf(s),url:s.url,live:s.live,state:s.state,needs:s.needs});
+  meta.clear();for(const s of list)meta.set(s.id,{title:nameOf(s),url:s.url,live:s.live,state:s.state,needs:s.needs,lastChangeMs:s.lastChangeMs});
   applyGrid();
   const slugs=new Set(list.map(s=>s.id));
   if(focusSlug!=null&&!slugs.has(focusSlug)&&list.length){ if(embed){/*keep waiting*/} else {viewGrid();if(location.pathname!=='/')history.replaceState({},'','/'+qstr());applyGrid();} }
@@ -557,14 +623,14 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-11d';
+const SW_VER = '2026-06-12b';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
   if (u === '/api/sessions') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify([...sessions.values()].map(s => ({ id: s.id, port: s.port, title: s.title, url: s.url, tabs: s.tabs || 1, live: !!(s.ws && s.lastFrame), state: stateOf(s), needs: needsAttention(s) }))));
+    res.end(JSON.stringify([...sessions.values()].map(s => ({ id: s.id, port: s.port, title: s.title, url: s.url, tabs: s.tabs || 1, live: !!(s.ws && s.lastFrame), state: stateOf(s), needs: needsAttention(s), lastChangeMs: s.lastPaintAt ? (Date.now() - s.lastPaintAt) : null }))));
   } else if (u === '/api/feed') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
     res.write('retry: 1000\n\n');

@@ -501,14 +501,20 @@ let dragOX=0,dragOY=0;                                          // pointer offse
 function beginDrag(id,px,py){dragId=id;document.body.classList.add('dragging');const x=tiles.get(id);if(!x)return;const el=x.el;
   const r=el.getBoundingClientRect();dragOX=px-r.left;dragOY=py-r.top;                  // lock the grab point so the tile sits under the finger
   el.style.width=r.width+'px';el.style.height=r.height+'px';el.style.left=r.left+'px';el.style.top=r.top+'px';el.classList.add('drag');}
-function moveDrag(px,py){const x=tiles.get(dragId);if(x){x.el.style.left=(px-dragOX)+'px';x.el.style.top=(py-dragOY)+'px';}dragOver(px,py);}
+let dragRAF=0,dragPX=0,dragPY=0;
+function moveDrag(px,py){dragPX=px;dragPY=py;const x=tiles.get(dragId);if(x){x.el.style.left=(px-dragOX)+'px';x.el.style.top=(py-dragOY)+'px';}dragOver(px,py);if(!dragRAF)dragRAF=requestAnimationFrame(edgeTick);}
+function edgeTick(){if(!dragId){dragRAF=0;return;}                  // auto-scroll when the finger nears a viewport edge (tall/phone grids)
+  const EZ=80,MAX=16,h=innerHeight;let v=0;
+  if(dragPY<EZ)v=-Math.ceil((EZ-dragPY)/EZ*MAX);else if(dragPY>h-EZ)v=Math.ceil((dragPY-(h-EZ))/EZ*MAX);
+  if(v){const before=scrollY;scrollBy(0,v);if(scrollY!==before){const x=tiles.get(dragId);if(x){x.el.style.left=(dragPX-dragOX)+'px';x.el.style.top=(dragPY-dragOY)+'px';}dragOver(dragPX,dragPY);}else v=0;}
+  dragRAF=v?requestAnimationFrame(edgeTick):0;}
 function dragOver(x,y){if(!dragId)return;const dx=tiles.get(dragId),el0=dx&&dx.el;       // hide the lifted tile from the hit-test so we read the tile underneath
   const pe=el0?el0.style.pointerEvents:'';if(el0)el0.style.pointerEvents='none';
   const el=document.elementFromPoint(x,y);if(el0)el0.style.pointerEvents=pe;
   if(!el)return;const tile=el.closest('.tile');if(!tile||!tile.dataset.id||tile.dataset.id===dragId)return;
   const from=order.indexOf(dragId),to=order.indexOf(tile.dataset.id);if(from<0||to<0)return;
   order.splice(to,0,order.splice(from,1)[0]);order.forEach((sid,i)=>{const tt=tiles.get(sid);if(tt)tt.el.style.order=i;});}
-function endDrag(){const x=tiles.get(dragId);if(x){x.el.classList.remove('drag');const s=x.el.style;s.width=s.height=s.left=s.top=s.pointerEvents='';}
+function endDrag(){if(dragRAF){cancelAnimationFrame(dragRAF);dragRAF=0;}const x=tiles.get(dragId);if(x){x.el.classList.remove('drag');const s=x.el.style;s.width=s.height=s.left=s.top=s.pointerEvents='';}
   document.body.classList.remove('dragging');dragId=null;lastDragEnd=Date.now();
   customOrder=order.slice();try{localStorage.setItem('order',JSON.stringify(customOrder));}catch(_){}}
 function toggleSel(id){const x=tiles.get(id);if(!x)return;if(selSet.has(id)){selSet.delete(id);x.el.classList.remove('sel');}else{selSet.add(id);x.el.classList.add('sel');}watchn.textContent=selSet.size;watchfab.classList.toggle('show',selSet.size>0);}
@@ -643,7 +649,7 @@ const MANIFEST = JSON.stringify({
   ]
 });
 // network pass-through SW (no content caching). Bump SW_VER on releases so the browser detects an update, clears any stale caches, and reloads open clients.
-const SW_VER = '2026-06-12e';
+const SW_VER = '2026-06-12f';
 const SW = "const V='" + SW_VER + "';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil((async()=>{for(const k of await caches.keys())await caches.delete(k);await self.clients.claim();for(const c of await self.clients.matchAll())try{c.navigate(c.url);}catch(e){}})()));self.addEventListener('fetch',e=>{});";
 
 const server = http.createServer((req, res) => {

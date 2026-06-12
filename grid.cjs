@@ -196,7 +196,7 @@ const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><cir
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13o';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13p';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -435,6 +435,9 @@ let focusSlug=null,focusES=null,feedES=null,editing=false;
 let watch=null;            // array of slugs for /watch, else null
 let embed=false;           // /embed mode
 const params=new URLSearchParams(location.search);
+// remembered preferences: a shared link's own params always win; otherwise seed each pref from this device's saved default
+['show','sort','fit'].forEach(k=>{ if(!params.has(k)){ let v=null; try{v=localStorage.getItem('pref_'+k);}catch(_){} if(v) params.set(k,v); } });
+function savePref(k,v){try{if(v)localStorage.setItem('pref_'+k,v);else localStorage.removeItem('pref_'+k);}catch(_){}}  // empty = back to default → forget it
 const _dec=document.createElement('textarea');
 function decodeEntities(s){if(!s||s.indexOf('&')<0)return s;_dec.innerHTML=s;return _dec.value;} // titles from CDP arrive HTML-encoded (e.g. &amp;)
 let names={};try{names=JSON.parse(localStorage.getItem('names')||'{}');}catch(_){}   // user-given custom session names
@@ -474,6 +477,7 @@ function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle'
 function qstr(){const s=params.toString();return s?('?'+s):'';}
 function render(){
   const path=decodeURIComponent(location.pathname);
+  try{localStorage.setItem('route',location.pathname);}catch(_){}   // remember where you are so a cold launch can return here
   let m;
   if((m=path.match(/^\\/embed\\/([^/]+)/))){embed=true;document.body.classList.add('embed');watch=null;viewFocus(m[1]);return;}
   embed=false;document.body.classList.remove('embed');
@@ -676,6 +680,7 @@ colBtns().forEach(b=>b.onclick=e=>{e.stopPropagation();setCols(b.dataset.c);});
 // init from query/localStorage
 if(params.get('fit')==='cover')document.body.classList.add('fit-cover');
 const initCols=params.get('cols')||localStorage.getItem('cols')||(innerWidth<=540?'1':'2'); // bigger tiles on phones by default
+if(initCols!=='2')params.set('cols',initCols);   // reflect non-default columns in the URL so it stays shareable
 grid.style.gridTemplateColumns='repeat('+initCols+',1fr)';colBtns().forEach(b=>b.classList.toggle('on',b.dataset.c===initCols));
 // reflect current query state onto the toolbar (desktop chips + mobile sheet share [data-show])
 const FILTERLBL={'':'Filter',live:'Live',idle:'Idle',multi:'Multi',needs:'Needs'};
@@ -684,13 +689,13 @@ function syncBar(){const show=params.get('show')||'';[...document.querySelectorA
   const sort=params.get('sort')||'';[...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.classList.toggle('on',(r.dataset.sort||'')===sort));
   fitrow.classList.toggle('on',params.get('fit')==='cover');}
 // filter chips + sheet Show buttons -> ?show (and exit /watch back to the grid); close the sheet after a sheet pick
-[...document.querySelectorAll('[data-show]')].forEach(c=>c.onclick=()=>{const v=c.dataset.show;if(v)params.set('show',v);else params.delete('show');nav('/');syncBar();optmenu.classList.remove('open');});
+[...document.querySelectorAll('[data-show]')].forEach(c=>c.onclick=()=>{const v=c.dataset.show;if(v){params.set('show',v);savePref('show',v);}else{params.delete('show');savePref('show','');}nav('/');syncBar();optmenu.classList.remove('open');});
 // options sheet opens from either the desktop Options button or the mobile Filter button
 optbtn.onclick=e=>{e.stopPropagation();optmenu.classList.toggle('open');};
 filterbtn.onclick=e=>{e.stopPropagation();optmenu.classList.toggle('open');};
 document.addEventListener('click',e=>{if(!optmenu.contains(e.target)&&!optbtn.contains(e.target)&&!filterbtn.contains(e.target))optmenu.classList.remove('open');});
-[...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.onclick=()=>{const v=r.dataset.sort;if(v)params.set('sort',v);else params.delete('sort');history.replaceState({},'',location.pathname+qstr());applyGrid();syncBar();});
-fitrow.onclick=()=>{const on=!document.body.classList.contains('fit-cover');document.body.classList.toggle('fit-cover',on);if(on)params.set('fit','cover');else params.delete('fit');history.replaceState({},'',location.pathname+qstr());syncBar();};
+[...optmenu.querySelectorAll('[data-sort]')].forEach(r=>r.onclick=()=>{const v=r.dataset.sort;if(v){params.set('sort',v);savePref('sort',v);}else{params.delete('sort');savePref('sort','');}history.replaceState({},'',location.pathname+qstr());applyGrid();syncBar();});
+fitrow.onclick=()=>{const on=!document.body.classList.contains('fit-cover');document.body.classList.toggle('fit-cover',on);if(on){params.set('fit','cover');savePref('fit','cover');}else{params.delete('fit');savePref('fit','');}history.replaceState({},'',location.pathname+qstr());syncBar();};
 activerow.onclick=()=>{optmenu.classList.remove('open');nav('/active');};
 document.getElementById('reloadrow').onclick=()=>{optmenu.classList.remove('open');buzz(15);location.reload();};   // hard reload: fresh fetch of app + latest build
 selbtn.onclick=()=>{if(reorderMode)setReorder(false);selectMode=!selectMode;document.body.classList.toggle('select',selectMode);selbtn.classList.toggle('on',selectMode);if(!selectMode){selSet.clear();[...tiles.values()].forEach(x=>x.el.classList.remove('sel'));watchfab.classList.remove('show');}};
@@ -739,6 +744,9 @@ addEventListener('pointerdown',function once(){if('Notification' in window&&Noti
     setTimeout(()=>{ptr.classList.remove('spin');ptr.style.transform='';ptr.style.opacity='';refreshing=false;},Math.max(0,520-(Date.now()-t0)));}
 })();
 
+// reopen where you left off: a bare cold launch ('/') returns to your last view; an explicit link/path always wins.
+// reflect seeded prefs into the address too so the URL stays shareable.
+(function(){let t=location.pathname;if(t==='/'){let r;try{r=localStorage.getItem('route');}catch(_){}if(r)t=r;}history.replaceState({},'',t+qstr());})();
 render();
 openFeed();
 lockWake();

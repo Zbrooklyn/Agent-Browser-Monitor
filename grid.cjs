@@ -56,7 +56,8 @@ function discoverPorts() {
   return new Promise((resolve) => {
     if (process.platform === 'win32') {
       const ps = "$pids=(Get-Process chrome,chromium,msedge,brave,vivaldi,thorium -EA SilentlyContinue).Id; Get-NetTCPConnection -State Listen -EA SilentlyContinue | ?{ $_.OwningProcess -in $pids -and $_.LocalAddress -eq '127.0.0.1' } | Select -Expand LocalPort -Unique";
-      execFile('powershell', ['-NoProfile', '-Command', ps], { timeout: 8000 }, (e, out) => resolve(parsePorts(out)));
+      // resolve(null) on a FAILED sweep (timeout/crash) so refresh() can tell "discovery failed" from "no browsers" and not wipe every tile
+      execFile('powershell', ['-NoProfile', '-Command', ps], { timeout: 8000 }, (e, out) => resolve(e ? null : parsePorts(out)));
     } else {
       // macOS / Linux: loopback LISTEN ports owned by a Chromium-family process (+c 0 keeps full command names)
       const names = 'chrome|chromium|brave|msedge|edge|vivaldi|thorium';
@@ -79,24 +80,35 @@ async function bestTarget(port) {
     return { best, tabs: pages.length };
   } catch { return { best: null, tabs: 0 }; }
 }
+let refreshing = false;
 async function refresh() {
-  const ports = await discoverPorts();
-  for (const port of ports) {
-    const tgt = await bestTarget(port);
-    if (!tgt.best) continue;
-    let s = sessions.get(port);
-    if (!s) {
-      s = { port, id: null, title: tgt.best.title, url: tgt.best.url, tabs: tgt.tabs, wsUrl: tgt.best.webSocketDebuggerUrl, ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, frames: 0 };
-      s.id = uniqueSlug(deriveSlug(s.url, s.title), port);
-      sessions.set(port, s); connect(s);
-    } else {
-      s.title = tgt.best.title; s.url = tgt.best.url; s.tabs = tgt.tabs;
-      // one-time upgrade: a generic session-N slug that now has a real domain earns a real name
-      if (/^session-\d+$/.test(s.id)) { const better = deriveSlug(s.url, s.title); if (better) s.id = uniqueSlug(better, port); }
-      if (s.wsUrl !== tgt.best.webSocketDebuggerUrl) { s.wsUrl = tgt.best.webSocketDebuggerUrl; try { s.ws && s.ws.close(); } catch {} connect(s); }
+  if (refreshing) return;                 // never let a slow sweep overlap the next tick (was spawning piled-up PowerShells)
+  refreshing = true;
+  try {
+    const ports = await discoverPorts();
+    if (!ports) return;                    // discovery FAILED this sweep — keep every existing tile, try again next tick
+    for (const port of ports) {
+      const tgt = await bestTarget(port);
+      if (!tgt.best) continue;
+      let s = sessions.get(port);
+      if (!s) {
+        s = { port, id: null, title: tgt.best.title, url: tgt.best.url, tabs: tgt.tabs, wsUrl: tgt.best.webSocketDebuggerUrl, ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, frames: 0, miss: 0 };
+        s.id = uniqueSlug(deriveSlug(s.url, s.title), port);
+        sessions.set(port, s); connect(s);
+      } else {
+        s.title = tgt.best.title; s.url = tgt.best.url; s.tabs = tgt.tabs;
+        // one-time upgrade: a generic session-N slug that now has a real domain earns a real name
+        if (/^session-\d+$/.test(s.id)) { const better = deriveSlug(s.url, s.title); if (better) s.id = uniqueSlug(better, port); }
+        if (s.wsUrl !== tgt.best.webSocketDebuggerUrl) { s.wsUrl = tgt.best.webSocketDebuggerUrl; try { s.ws && s.ws.close(); } catch {} connect(s); }
+      }
     }
-  }
-  for (const [port, s] of sessions) { if (!ports.includes(port)) { try { s.ws && s.ws.close(); } catch {} sessions.delete(port); } }
+    // prune is DEBOUNCED: a port must be absent for 2 consecutive good sweeps (~10s) before its tile is removed,
+    // so a single partial sweep can't blank the wall
+    for (const [port, s] of sessions) {
+      if (ports.includes(port)) { s.miss = 0; }
+      else if ((s.miss = (s.miss || 0) + 1) >= 2) { try { s.ws && s.ws.close(); } catch {} sessions.delete(port); }
+    }
+  } finally { refreshing = false; }
 }
 
 // ---- per-session tile screencast -> multiplexed feed ------------------------
@@ -105,7 +117,9 @@ function connect(s) {
   try {
     const ws = new WebSocket(s.wsUrl); s.ws = ws; let id = 0;
     const send = (m, p = {}) => { try { ws.send(JSON.stringify({ id: ++id, method: m, params: p })); } catch {} };
-    ws.onopen = () => { send('Page.enable'); send('Page.startScreencast', TILE); };
+    // focus-emulation + active lifecycle keep rAF/animations running even though these windows are backgrounded/occluded
+    // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
+    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.method === 'Page.screencastFrame') {
@@ -128,7 +142,7 @@ function hqConnect(slug) {
   try {
     const ws = new WebSocket(s.wsUrl); h.ws = ws; let id = 0;
     const send = (m, p = {}) => { const i = ++id; try { ws.send(JSON.stringify({ id: i, method: m, params: p })); } catch {} return i; };
-    ws.onopen = () => { send('Page.enable'); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); };
+    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.method === 'Page.screencastFrame') { send('Page.screencastFrameAck', { sessionId: m.params.sessionId }); h.lastPaintAt = Date.now(); push(m.params.data); }
@@ -180,7 +194,7 @@ const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-13i';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-13j';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

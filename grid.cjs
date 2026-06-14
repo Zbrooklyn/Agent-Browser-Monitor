@@ -138,15 +138,21 @@ function connect(s) {
 function hqConnect(slug) {
   let h = hq.get(slug); if (h) return h;
   const s = sessionBySlug(slug); if (!s || !s.wsUrl) return null;
-  h = { ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, subs: new Set(), capT: null }; hq.set(slug, h);
+  h = { ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, subs: new Set(), capT: null, send: null, vw: 0, vh: 0, lmId: 0 }; hq.set(slug, h);
   const push = (data) => { h.lastFrame = data; h.lastSentAt = Date.now(); const pl = `data: ${data}\n\n`; for (const c of h.subs) { try { c.write(pl); } catch {} } };
   try {
     const ws = new WebSocket(s.wsUrl); h.ws = ws; let id = 0;
     const send = (m, p = {}) => { const i = ++id; try { ws.send(JSON.stringify({ id: i, method: m, params: p })); } catch {} return i; };
-    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); };
+    h.send = send;                                   // exposed so /api/input can dispatch on this focus socket
+    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); h.lmId = send('Page.getLayoutMetrics'); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.method === 'Page.screencastFrame') { send('Page.screencastFrameAck', { sessionId: m.params.sessionId }); h.lastPaintAt = Date.now(); push(m.params.data); }
+      if (m.method === 'Page.screencastFrame') {
+        send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
+        const md = m.params.metadata; if (md) { if (md.deviceWidth) h.vw = md.deviceWidth; if (md.deviceHeight) h.vh = md.deviceHeight; } // viewport CSS px → click mapping
+        h.lastPaintAt = Date.now(); push(m.params.data);
+      }
+      else if (m.id === h.lmId && m.result && m.result.cssLayoutViewport) { const lv = m.result.cssLayoutViewport; if (!h.vw) h.vw = lv.clientWidth; if (!h.vh) h.vh = lv.clientHeight; } // fallback viewport size for a static page
       else if (m.id !== undefined && m.result && typeof m.result.data === 'string') { push(m.result.data); } // captureScreenshot seed/refresh
     };
     ws.onclose = () => { h.ws = null; };
@@ -156,6 +162,39 @@ function hqConnect(slug) {
   return h;
 }
 function hqMaybeClose(slug) { const h = hq.get(slug); if (h && h.subs.size === 0) { clearInterval(h.capT); try { h.ws && h.ws.close(); } catch {} hq.delete(slug); } }
+
+// ---- input back-channel (Path A: light click/type into the FOCUSED session) -
+// Coordinates arrive as 0..1 fractions of the page content; we scale by the real
+// viewport CSS size captured above. Only the on-demand focus session is driveable.
+const KEYMAP = {
+  Enter:     { vk: 13, key: 'Enter',     code: 'Enter',     text: '\r' },
+  Backspace: { vk: 8,  key: 'Backspace', code: 'Backspace' },
+  Tab:       { vk: 9,  key: 'Tab',       code: 'Tab' },
+};
+function dispatchInput(j) {
+  const h = hq.get(j && j.slug); if (!h || !h.send || !h.ws) return false;
+  const vw = h.vw || HQ.maxWidth, vh = h.vh || HQ.maxHeight;
+  const X = Math.round(Math.max(0, Math.min(1, +j.xf || 0)) * vw);
+  const Y = Math.round(Math.max(0, Math.min(1, +j.yf || 0)) * vh);
+  if (j.kind === 'click') {
+    h.send('Input.dispatchMouseEvent', { type: 'mouseMoved',    x: X, y: Y, button: 'none' });
+    h.send('Input.dispatchMouseEvent', { type: 'mousePressed',  x: X, y: Y, button: 'left', buttons: 1, clickCount: 1 });
+    h.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: X, y: Y, button: 'left', buttons: 0, clickCount: 1 });
+  } else if (j.kind === 'wheel') {
+    const dX = Math.round((+j.dxf || 0) * vw + (+j.dx || 0));   // client sends fractions of the viewport (dxf/dyf); accept raw px too
+    const dY = Math.round((+j.dyf || 0) * vh + (+j.dy || 0));
+    h.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: X, y: Y, deltaX: dX, deltaY: dY });
+  } else if (j.kind === 'text') {
+    if (typeof j.text === 'string' && j.text) h.send('Input.insertText', { text: j.text });
+    else return false;
+  } else if (j.kind === 'key') {
+    const K = KEYMAP[j.key]; if (!K) return false;
+    const t = K.text ? 'keyDown' : 'rawKeyDown';
+    h.send('Input.dispatchKeyEvent', { type: t, windowsVirtualKeyCode: K.vk, nativeVirtualKeyCode: K.vk, key: K.key, code: K.code, ...(K.text ? { text: K.text } : {}) });
+    h.send('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: K.vk, nativeVirtualKeyCode: K.vk, key: K.key, code: K.code });
+  } else return false;
+  return true;
+}
 
 // ---- fps floor: re-send last frame to keep streams warm when idle ----------
 setInterval(() => {
@@ -193,12 +232,14 @@ const ICOSTAR = '<svg viewBox="0 0 24 24"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6
 const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+const ICOCURSOR = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M5 2.5l14.5 8.2-6.1 1.2-1 .2-.5.9-2.9 5.6z"/></svg>'; // arrow cursor — "take control"
+const ICOKEYB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>';
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-14c';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-14h-scrollfeel';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -371,6 +412,21 @@ body.offline #empty .emsg-off{display:block}
 /* fill-the-glass: rotate the view 90° (element takes swapped dims; applyZoom adds the rotate transform) */
 #focus.rot #fimg{inset:auto;top:50%;left:50%;width:100vh;height:100vw;transform-origin:center}
 .fbtn.on{color:var(--live);background:#3ecf8e26;box-shadow:inset 0 0 0 1px #3ecf8e66}
+/* Path A: take-control mode — tap=click, drag=scroll, Type pill summons the keyboard */
+#focus.ctl #fimg{cursor:crosshair}
+#fcursor{position:absolute;left:-99px;top:-99px;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--live);border-radius:50%;box-shadow:0 0 12px #3ecf8eaa;pointer-events:none;z-index:53;opacity:0;transform:scale(.6);transition:opacity .2s,transform .2s}
+#fcursor.show{opacity:1;transform:scale(1)}
+#ftype{position:absolute;left:-9999px;top:0;width:8px;height:8px;opacity:0;border:0;padding:0}
+#fctlbar{position:absolute;right:13px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;z-index:54;transition:opacity .25s}
+#fctlbar button{align-items:center;gap:7px;padding:11px 15px;border:none;border-radius:13px;color:#fff;font-size:14px;font-weight:650;cursor:pointer}
+#fctlbar button svg{width:18px;height:18px}
+#fctl{display:inline-flex}
+#ftypebtn{display:none}
+#focus.ctl #ftypebtn{display:inline-flex}
+#fctl.on{color:#06210d;background:var(--live);box-shadow:0 0 16px #3ecf8e66}
+#focus.ctl #fnav{display:none}          /* pager hidden while controlling — bottom belongs to the control pills */
+#fnav #fzap{display:none}                /* drop the redundant jump-to-active to slim the pager (beats #fnav button) */
+#focus.idle #fctlbar{opacity:0;pointer-events:none}
 #fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
@@ -399,7 +455,7 @@ body.offline #empty .emsg-off{display:block}
 #fmenu .pinrow svg{fill:currentColor;stroke:none;opacity:1}
 #fmenu .pinrow.on{color:#e8c66a}
 #fmenu .sep{height:1px;background:#ffffff14;margin:4px 8px;padding:0}
-#fnav{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:2px;align-items:center;border-radius:13px;padding:4px;z-index:52;transition:opacity .25s}
+#fnav{position:absolute;left:13px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:2px;align-items:center;border-radius:13px;padding:4px;z-index:52;transition:opacity .25s}  /* left-anchored so it never collides with the right-anchored control pills */
 #fnav button{width:48px;height:42px;border:none;background:transparent;color:#fff;font-size:21px;cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center}
 #fnav button:active{background:#ffffff22}
 #fzap svg{width:18px;height:18px;fill:currentColor;stroke:none}
@@ -448,7 +504,7 @@ body.embed #focus{display:block}
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
 <div id="empty">${MARK}<div class="emsg"><h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div><div class="emsg-off"><h2>Can&rsquo;t reach the dashboard</h2><p>The server looks offline. This reconnects automatically the moment it&rsquo;s back.</p></div></div>
-<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="frot" class="fbtn glass" aria-label="Rotate to fill" title="Rotate to fill">${ICOROT}</button><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div></div>
+<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
@@ -501,7 +557,7 @@ function viewFocus(slug){
   fimg.removeAttribute('src');if(focusES)focusES.close();
   focusES=new EventSource('/api/hq/'+slug);focusES.onmessage=e=>fimg.src='data:image/jpeg;base64,'+e.data;
   if(params.get('full')==='1')requestFS();}
-function viewGrid(){focus.classList.remove('on','idle');if(focusES){focusES.close();focusES=null;}focusSlug=null;document.title='Agent Browsers';}
+function viewGrid(){if(controlOn)setControl(false);focus.classList.remove('on','idle');if(focusES){focusES.close();focusES=null;}focusSlug=null;document.title='Agent Browsers';}
 function fmtAgo(ms){if(ms==null)return '';const s=Math.round(ms/1000);if(s<2)return 'live';if(s<60)return s+'s ago';const m=Math.round(s/60);if(m<60)return m+'m ago';return Math.round(m/60)+'h ago';}
 // keep the focus-bar title tight: a page <title> like "Stripe | Financial Infrastructure…" shows as just "Stripe"
 function shortTitle(t){if(!t)return '';const p=t.split(/\\s[|\\u2013\\u2014\\u00b7-]\\s/)[0].trim();return p||t;}
@@ -545,13 +601,13 @@ function doFullscreen(){if(nativeFS()){(document.exitFullscreen||document.webkit
 async function doCopy(){if(!focusSlug)return;const url=location.origin+'/'+focusSlug;try{await navigator.clipboard.writeText(url);buzz(12);}catch(_){}}
 function doSave(){if(!fimg.src)return;const a=document.createElement('a');a.href=fimg.src;a.download=(focusSlug||'frame')+'-'+Date.now()+'.jpg';document.body.appendChild(a);a.click();a.remove();buzz(12);}
 function closeFMenu(){fmenu.classList.remove('on');}
-frot.onclick=e=>{e.stopPropagation();toggleRot();};
 fmore.onclick=e=>{e.stopPropagation();fmenu.classList.toggle('on');};
 fmenu.onclick=e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();const act=b.dataset.act;closeFMenu();
   if(act==='pin'){if(focusSlug){togglePin(focusSlug);syncFocusBar();}}
   else if(act==='rename')startRename();
   else if(act==='copy')doCopy();
   else if(act==='save')doSave();
+  else if(act==='rotate')toggleRot();
   else if(act==='fs')doFullscreen();};
 addEventListener('click',e=>{if(fmenu.classList.contains('on')&&!(e.target.closest&&e.target.closest('#fmenu,#fmore')))closeFMenu();});
 fzap.onclick=e=>{e.stopPropagation();buzz();nav('/active');};
@@ -575,23 +631,43 @@ function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms||10);}catch(_){}}
 let z=1,tx=0,ty=0,pts=new Map(),pinch=null,swipe=null,multi=false;
 function applyZoom(){fimg.style.transform=focus.classList.contains('rot')?('translate(-50%,-50%) rotate(90deg) scale('+z+')'):('translate('+tx+'px,'+ty+'px) scale('+z+')');}
 function resetZoom(){z=1;tx=0;ty=0;applyZoom();}
-function toggleRot(){focus.classList.toggle('rot');frot.classList.toggle('on',focus.classList.contains('rot'));resetZoom();buzz();}   // fill the glass: rotate the view 90° so a landscape page fills a portrait phone
-fimg.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{fimg.setPointerCapture(e.pointerId);}catch(_){}
+function toggleRot(){focus.classList.toggle('rot');resetZoom();buzz();}   // fill the glass: rotate the view 90° so a landscape page fills a portrait phone
+fimg.addEventListener('pointerdown',e=>{cancelMomentum();vel.x=0;vel.y=0;vel.t=Date.now();pts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{fimg.setPointerCapture(e.pointerId);}catch(_){}
   if(pts.size===1){swipe={x:e.clientX,y:e.clientY,t:Date.now()};multi=false;}
   if(pts.size===2){multi=true;const p=[...pts.values()];pinch={d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),z};}});
 fimg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;if(focus.classList.contains('rot'))return;const prev=pts.get(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(pts.size===2&&pinch){const p=[...pts.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);z=Math.max(1,Math.min(5,pinch.z*d/pinch.d));if(z===1){tx=0;ty=0;}applyZoom();}
-  else if(pts.size===1&&z>1){tx+=e.clientX-prev.x;ty+=e.clientY-prev.y;applyZoom();}});
+  else if(pts.size===1&&z>1){tx+=e.clientX-prev.x;ty+=e.clientY-prev.y;applyZoom();}
+  else if(controlOn&&pts.size===1){scrollDrag(e.clientX,e.clientY,e.clientX-prev.x,e.clientY-prev.y);}});
 function liftPtr(e){
   // single-finger flick on an un-zoomed image: ←/→ switch session, swipe-down closes
   if(pts.size===1&&!multi&&z===1&&swipe){const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y,dt=Date.now()-swipe.t;
-    if(Math.abs(dx)<10&&Math.abs(dy)<10){toggleChrome();}            // a tap toggles all chrome (works rotated too)
-    else if(!focus.classList.contains('rot')){                       // swipe nav/close only when not rotated
+    if(Math.abs(dx)<10&&Math.abs(dy)<10){controlOn?clickAt(e.clientX,e.clientY):toggleChrome();}   // control mode: tap=click; else tap toggles chrome
+    else if(controlOn&&!focus.classList.contains('rot')){startMomentum();}   // control-mode drag: flick coasts after lift
+    else if(!controlOn&&!focus.classList.contains('rot')){           // swipe nav/close only in watch mode, not rotated
       if(dt<600&&Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.3){step(dx<0?1:-1);}
       else if(dt<600&&dy>90&&dy>Math.abs(dx)){buzz();nav('/');}}}
   pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(pts.size===0)swipe=null;}
 fimg.addEventListener('pointerup',liftPtr);fimg.addEventListener('pointercancel',liftPtr);
 fimg.addEventListener('dblclick',()=>{z>1?resetZoom():(z=2,applyZoom());});
+
+// ---------- Path A: take control (tap=click · drag=scroll · Type=keyboard) ----------
+let controlOn=false,vel={x:0,y:0,t:0},momRAF=0; const fctl=document.getElementById('fctl'),ftype=document.getElementById('ftype'),fcursor=document.getElementById('fcursor'),ftypebtn=document.getElementById('ftypebtn'),wq={dx:0,dy:0,t:0};
+function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');}else{if(ftype)ftype.blur();if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}
+if(fctl)fctl.onclick=e=>{e.stopPropagation();setControl(!controlOn);};
+// map a client point to a 0..1 fraction within the contain-fitted image (null = on the letterbox)
+function imgFrac(cx,cy){if(!fimg.naturalWidth||!fimg.naturalHeight)return null;const b=fimg.getBoundingClientRect();const ar=fimg.naturalWidth/fimg.naturalHeight,br=b.width/b.height;let dw,dh,ox,oy;if(ar>br){dw=b.width;dh=b.width/ar;ox=0;oy=(b.height-dh)/2;}else{dh=b.height;dw=b.height*ar;oy=0;ox=(b.width-dw)/2;}const xf=(cx-b.left-ox)/dw,yf=(cy-b.top-oy)/dh;if(xf<0||xf>1||yf<0||yf>1)return null;return{xf,yf};}
+function sendInput(p){try{fetch('/api/input',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify(Object.assign({slug:focusSlug},p))});}catch(_){}}
+function clickAt(cx,cy){const f=imgFrac(cx,cy);if(!f)return;if(fcursor){fcursor.style.left=cx+'px';fcursor.style.top=cy+'px';fcursor.classList.add('show');setTimeout(()=>fcursor.classList.remove('show'),650);}buzz(10);sendInput({kind:'click',xf:f.xf,yf:f.yf});}
+// the page is contain-fitted into the image box; scroll against the actual content rect (not the letterboxed box) so the page tracks the finger 1:1
+function imgContent(){const b=fimg.getBoundingClientRect();const ar=(fimg.naturalWidth||1)/(fimg.naturalHeight||1),br=b.width/b.height;let dw,dh;if(ar>br){dw=b.width;dh=b.width/ar;}else{dh=b.height;dw=b.height*ar;}return{dw,dh};}
+function sampleVel(dxc,dyc){const n=Date.now(),dt=Math.max(1,n-vel.t),k=.55;vel.x=k*(dxc/dt)+(1-k)*vel.x;vel.y=k*(dyc/dt)+(1-k)*vel.y;vel.t=n;}   // EMA px/ms for the flick
+function scrollDrag(cx,cy,dxc,dyc){sampleVel(dxc,dyc);wq.dx+=dxc;wq.dy+=dyc;const n=Date.now();if(n-wq.t<33)return;const c=imgContent();const f=imgFrac(cx,cy)||{xf:.5,yf:.5};sendInput({kind:'wheel',xf:f.xf,yf:f.yf,dxf:-wq.dx/c.dw,dyf:-wq.dy/c.dh});wq.dx=0;wq.dy=0;wq.t=n;}
+function cancelMomentum(){if(momRAF){cancelAnimationFrame(momRAF);momRAF=0;}}
+function startMomentum(){cancelMomentum();let vx=vel.x,vy=vel.y;const sp=Math.hypot(vx,vy);if(sp<0.3)return;const cap=2.5;if(sp>cap){vx*=cap/sp;vy*=cap/sp;}const c=imgContent();let last=Date.now();const step=()=>{const n=Date.now(),dt=Math.min(40,n-last);last=n;sendInput({kind:'wheel',xf:.5,yf:.5,dxf:-vx*dt/c.dw,dyf:-vy*dt/c.dh});const fr=Math.pow(.94,dt/16);vx*=fr;vy*=fr;momRAF=Math.hypot(vx,vy)>0.02?requestAnimationFrame(step):0;};momRAF=requestAnimationFrame(step);}
+if(ftypebtn)ftypebtn.onclick=e=>{e.stopPropagation();if(ftype)ftype.focus();buzz(10);};
+if(ftype){ftype.addEventListener('input',()=>{const v=ftype.value;if(v){sendInput({kind:'text',text:v});ftype.value='';}});
+  ftype.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();sendInput({kind:'key',key:'Enter'});}else if(e.key==='Backspace'){e.preventDefault();sendInput({kind:'key',key:'Backspace'});}else if(e.key==='Tab'){e.preventDefault();sendInput({kind:'key',key:'Tab'});}});}
 
 // ---------- tiles ----------
 function setTabs(x,n){x.tn.textContent=n;x.el.classList.toggle('multi',n>1);}
@@ -867,6 +943,11 @@ self.addEventListener('fetch',e=>{const req=e.request;if(req.method!=='GET')retu
 
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
+  if (req.method === 'POST' && u === '/api/input') {     // Path A: light click/type into the focused session
+    let body = ''; req.on('data', c => { body += c; if (body.length > 16384) req.destroy(); });
+    req.on('end', () => { let j = null; try { j = JSON.parse(body); } catch {} const ok = !!(j && dispatchInput(j)); res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(`{"ok":${ok}}`); });
+    return;
+  }
   if (u === '/api/sessions') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify([...sessions.values()].map(s => ({ id: s.id, port: s.port, title: s.title, url: s.url, tabs: s.tabs || 1, live: !!(s.ws && s.lastFrame), state: stateOf(s), needs: needsAttention(s), lastChangeMs: s.lastPaintAt ? (Date.now() - s.lastPaintAt) : null }))));

@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Form Test</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+body{margin:0;background:#0f1115;color:#e6e6ea;padding:22px}
+h1{font-size:25px;margin:0 0 4px}.sub{color:#8a8a93;font-size:14px;margin:0 0 18px}
+label{display:block;font-size:14px;color:#b6b6c0;margin:16px 0 6px;font-weight:600}
+input,select{width:100%;font-size:18px;padding:14px;border-radius:10px;border:1px solid #34343c;background:#181b22;color:#fff}
+input:focus,select:focus{outline:2px solid #3ecf8e;border-color:#3ecf8e}
+.row{display:flex;align-items:center;gap:10px;margin-top:18px}.row input{width:26px;height:26px}.row label{margin:0}
+button{margin-top:24px;width:100%;font-size:18px;font-weight:700;padding:16px;border:0;border-radius:12px;background:#3ecf8e;color:#06210d;cursor:pointer}
+#ok{display:none;margin-top:18px;padding:14px;border-radius:10px;background:#10381f;border:1px solid #3ecf8e;color:#7ee08a;font-size:15px;white-space:pre-wrap}
+</style></head><body>
+<h1>Demo Sign-Up</h1><p class="sub">Test form — no real data, nothing is sent anywhere.</p>
+<form id="f">
+<label for="name">Full name</label><input id="name" placeholder="Ada Lovelace" autocomplete="off">
+<label for="email">Email</label><input id="email" type="email" placeholder="you@example.com" autocomplete="off">
+<label for="plan">Plan</label><select id="plan"><option>Free</option><option>Pro</option><option>Team</option></select>
+<div class="row"><input id="agree" type="checkbox"><label for="agree">I agree to the test terms</label></div>
+<button type="submit">Create account</button>
+</form>
+<div id="ok"></div>
+<script>
+var f=document.getElementById('f'),ok=document.getElementById('ok');
+f.addEventListener('submit',function(e){e.preventDefault();
+  ok.textContent='✓ Submitted\nName: '+document.getElementById('name').value+'\nEmail: '+document.getElementById('email').value+'\nPlan: '+document.getElementById('plan').value+'\nAgree: '+(document.getElementById('agree').checked?'yes':'no');
+  ok.style.display='block';document.title='SUBMITTED';});
+</script></body></html>

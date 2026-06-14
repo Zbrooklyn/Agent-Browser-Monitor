@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ctltest</title>
+<style>html,body{margin:0;height:100%}#t{position:fixed;inset:0;box-sizing:border-box;font-size:32px;padding:16px;border:0;background:#10131a;color:#7ee08a;font-family:monospace}</style>
+</head><body>
+<textarea id="t" autofocus placeholder="control-test target"></textarea>
+<script>
+  var t=document.getElementById('t');
+  t.addEventListener('input',function(){document.title='TXT:'+t.value;});
+  addEventListener('click',function(e){document.title='CLK:'+Math.round(e.clientX)+','+Math.round(e.clientY);});
+</script>
+</body></html>

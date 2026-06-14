@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SCROLLPAGE</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,sans-serif}
+body{margin:0;background:#0f1115;color:#e6e6ea}
+#readout{position:fixed;top:0;left:0;right:0;padding:10px 14px;background:#3ecf8e;color:#06210d;font-size:20px;font-weight:800;z-index:9}
+section{padding:60px 22px;font-size:26px;border-bottom:1px solid #23262e}
+section:nth-child(even){background:#161922}
+</style></head><body>
+<div id="readout">scrollY: 0</div>
+<div id="content"></div>
+<script>
+var c=document.getElementById('content');
+for(var i=1;i<=40;i++){var s=document.createElement('section');s.textContent='Block '+i+' — drag up in control mode to scroll past this.';c.appendChild(s);}
+var r=document.getElementById('readout');
+addEventListener('scroll',function(){r.textContent='scrollY: '+Math.round(window.scrollY);},{passive:true});
+</script>
+</body></html>

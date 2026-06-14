@@ -6,10 +6,12 @@ phone, tablet, or laptop.
 
 It is a single Node file with **zero dependencies**. It auto-discovers every Chromium
 remote-debugging port on the machine, shows each as a live tile, and lets you tap into
-any one for a high-resolution focused stream.
+any one for a high-resolution focused stream — and, when you need to, take control and
+drive it yourself.
 
-> **Watch-only today.** It streams what the browsers are doing; it does not control them.
-> Interactive takeover is on the roadmap.
+> **Watch by default, control when you want it.** Tap **Control** in the focused view to
+> click, type, and scroll the real browser from your phone. See [Security](#security) for
+> the one boundary (don't drive a fresh sign-in through it).
 
 ![Agent Browsers — watch a fleet of AI-driven browsers live from one dashboard](docs/hero-desktop.png)
 
@@ -34,6 +36,9 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
 - **Focused high-res view** — tap a tile for a crisp 1080p+ stream: pinch-zoom, tap to
   toggle the chrome away, rotate-to-fill, swipe between sessions, keyboard nav, and an
   overflow menu (pin, rename, copy link, save frame, fullscreen).
+- **Take control** — tap **Control** in the focused view to drive the browser yourself:
+  tap-to-click, a keyboard for typing (Enter / Backspace / Tab), and drag-to-scroll with
+  1:1 finger tracking and inertial flick. Toggle it off to return to watch-only.
 - **Organize the grid** — drag to reorder (with a dedicated touch Reorder mode), pin
   favorites to the top, and rename sessions; your arrangement persists.
 - **Reliable streaming** — dropped CDP sockets auto-reconnect, a "Reconnecting…" banner
@@ -132,10 +137,16 @@ node grid.cjs [host] [port]
 
 ## Security
 
-- **Watch-only.** There is no input path to the browsers.
+- **Control is real input.** With Control enabled the dashboard sends live clicks,
+  keystrokes, and scrolls to the browser over CDP. The stream has **no authentication**,
+  so anyone who can reach the URL can drive your browsers — keep it private.
 - Binds to `127.0.0.1`. Nothing is exposed until you choose to. A tailnet via
-  `tailscale serve` is the recommended private option. **Do not put it on the public
-  internet** — the stream has no authentication.
+  `tailscale serve` is the recommended private option. **Never put it on the public
+  internet.**
+- **Don't drive a fresh sign-in through it.** Browsers launched for CDP are flagged as
+  automation, so a freshly typed Google/SSO password is refused ("this browser may not be
+  secure") — that is the provider's policy, not a bug. Control works fine on sessions that
+  are *already* signed in; do the login itself in a normal browser (or via a passkey).
 
 ## Troubleshooting
 
@@ -163,7 +174,7 @@ on the same tailnet.
 - **Multi-tab drill-in** — see and switch between a session's tabs, not just its active one.
 - **Real video streaming (WebRTC)** — smoother, higher-frame-rate than the JPEG screencast.
 - **Recording / clips** — capture a session to a short clip you can save.
-- **Interactive takeover** (future) — pause the agent, drive the browser yourself, hand back.
+- **Agent coordination** — pause the driving agent while you take control, then hand back.
 
 Single-machine by design: it watches the box it runs on. Run one instance per machine.
 

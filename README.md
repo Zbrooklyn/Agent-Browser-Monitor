@@ -70,6 +70,9 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
 
 ## Install
 
+> New to this? The [step-by-step install guide](docs/INSTALL.md) walks a first-time user
+> through it on Windows or macOS, no coding required.
+
 No package manager and no build step — clone (or just download `grid.cjs`) and run it:
 
 ```bash

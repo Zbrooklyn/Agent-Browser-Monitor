@@ -128,7 +128,21 @@ full-screen stream.
 
 ---
 
-## 6. (Optional) Watch it from your phone
+## 6. (Optional) Keep it always running
+
+The dashboard only runs while the terminal window from step 3 is open. If you want it to
+stay up on its own — survive crashes and reclaim its port if something else grabs it —
+the repo includes a small guardian script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File port-guardian.ps1 -Port 8090
+```
+
+To start it automatically every time you log in, see the **Keep it always-on** section of
+the [README](https://github.com/Zbrooklyn/Agent-Browser-Monitor#readme). Skip this if you
+are just trying it out.
+
+## 7. (Optional) Watch it from your phone
 
 The dashboard stays private to the computer it runs on. To reach it from a phone without
 exposing anything to the internet, the simplest option is **Tailscale** (a free private

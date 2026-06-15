@@ -79,7 +79,7 @@ namespace AgentBrowsers
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
-                using (GraphicsPath bgp = Rounded(new Rectangle(1, 1, 30, 30), 7))
+                using (GraphicsPath bgp = Rounded(new Rectangle(1, 1, 30, 30), 5))
                 using (SolidBrush bg = new SolidBrush(Color.FromArgb(255, 18, 21, 28)))
                     g.FillPath(bg, bgp);
 

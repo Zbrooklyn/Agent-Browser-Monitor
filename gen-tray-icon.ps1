@@ -22,7 +22,7 @@ function New-Badge([int]$N) {
   }
 
   $bg = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 18, 21, 28))
-  $g.FillPath($bg, (RR (1 * $sc) (1 * $sc) (30 * $sc) (30 * $sc) (7 * $sc)))
+  $g.FillPath($bg, (RR (1 * $sc) (1 * $sc) (30 * $sc) (30 * $sc) (5 * $sc)))
 
   $tile = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(62, 207, 142))
   $s = 11 * $sc; $gap = 2 * $sc; $x0 = 4 * $sc; $y0 = 4 * $sc

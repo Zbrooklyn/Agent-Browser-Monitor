@@ -112,6 +112,31 @@ to the home screen.
 On Windows, `start-stream.ps1` / `stop-stream.ps1` wrap this: they launch the dashboard
 detached (surviving the shell), set up the tailnet proxy, and print your phone URL.
 
+### Keep it always-on (port guardian)
+
+If you rely on the dashboard at a fixed port/URL, `port-guardian.ps1` makes the port
+**stay yours**. It is a tiny supervisor loop that:
+
+- restarts `grid.cjs` within seconds if it ever crashes or is killed, and
+- evicts any other process that has grabbed the port during a gap, then rebinds the
+  dashboard (and re-points the `tailscale serve` proxy at it).
+
+There is no OS-level "reserve this port for one app" on Windows — a low port goes to
+whoever binds it first, and `netsh` exclusions lock it out for *everyone*. Continuously
+occupying the port (and reclaiming it on any gap) is what actually keeps it yours.
+
+```powershell
+# run it now (foreground)
+powershell -ExecutionPolicy Bypass -File port-guardian.ps1 -Port 8090
+
+# start at logon: drop a one-line .vbs in your Startup folder that launches it hidden
+#   shell:startup  ->  AgentBrowsersGuardian.vbs:
+#   CreateObject("WScript.Shell").Run "powershell -WindowStyle Hidden -ExecutionPolicy Bypass -NoProfile -File ""<path>\port-guardian.ps1"" -Port 8090", 0, False
+```
+
+(If your environment allows Task Scheduler, registering it as an `AtLogon` task with
+restart-on-failure is tidier; the Startup-folder route is the no-privileges fallback.)
+
 ## Configuration
 
 All optional, via flags or environment variables:

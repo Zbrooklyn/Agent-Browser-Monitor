@@ -14,6 +14,9 @@ ROADMAP.md
 # node
 node_modules/
 
+# build output (built from AgentBrowsersTray.cs via build-tray.ps1)
+AgentBrowsers.exe
+
 # OS
 .DS_Store
 Thumbs.db

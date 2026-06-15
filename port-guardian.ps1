@@ -5,7 +5,8 @@
 # process kills + user-scope task => no elevation needed.
 param(
   [int]$Port = 8090,
-  [string]$BindHost = "127.0.0.1"
+  [string]$BindHost = "127.0.0.1",
+  [int]$OwnerPid = 0          # if set, this guardian stops the server and exits when that process (the tray) is gone
 )
 $ErrorActionPreference = "SilentlyContinue"
 $grid      = Join-Path $PSScriptRoot "grid.cjs"   # portable: resolves next to this script
@@ -25,6 +26,13 @@ function GridIsOnPort {
 }
 
 while ($true) {
+  # if the owner (tray) is gone, stop the server and exit — nothing runs without the icon
+  if ($OwnerPid -ne 0 -and -not (Get-Process -Id $OwnerPid -ErrorAction SilentlyContinue)) {
+    Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+      Where-Object { $_.CommandLine -like '*grid.cjs*' } |
+      ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    exit
+  }
   if (-not (GridIsOnPort)) {
     # 1) evict anything that isn't our grid squatting the reserved port
     foreach ($c in Get-Listeners) {

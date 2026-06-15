@@ -137,6 +137,31 @@ powershell -ExecutionPolicy Bypass -File port-guardian.ps1 -Port 8090
 (If your environment allows Task Scheduler, registering it as an `AtLogon` task with
 restart-on-failure is tidier; the Startup-folder route is the no-privileges fallback.)
 
+### Tray icon (Windows)
+
+For a visible, controllable presence instead of a hidden background process, build the
+tray app. It puts an icon in the system tray — **green = server up**, grey = down — with a
+right-click menu (Open dashboard, Copy phone link, Restart server, **Quit**). It owns the
+guardian, so the icon is the source of truth: if it's showing, the server is running, and
+**Quit fully stops everything** (no invisible leftover process). It shows up in Task
+Manager as `AgentBrowsers.exe`, not a mystery `node.exe`.
+
+```powershell
+# build it (uses the .NET Framework C# compiler already on Windows — no SDK/npm)
+powershell -ExecutionPolicy Bypass -File build-tray.ps1
+# run it
+Start-Process .\AgentBrowsers.exe
+```
+
+Auto-start at logon: drop a one-line `.vbs` in your Startup folder (`shell:startup`) that
+runs the exe — `CreateObject("WScript.Shell").Run "<path>\AgentBrowsers.exe", 0, False`.
+Because the guardian is tied to the tray, closing the tray (even via Task Manager) stops
+the server too — nothing keeps running without the icon.
+
+> Design note: a tray icon needs an interactive logon session, so this starts at *login*,
+> not before it. A true before-login service would have to run headless with no icon — the
+> opposite of "you can always see it's running" — so that is deliberately not the default.
+
 ## Configuration
 
 All optional, via flags or environment variables:

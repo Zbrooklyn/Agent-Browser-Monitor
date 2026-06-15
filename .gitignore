@@ -23,3 +23,6 @@ Thumbs.db
 
 # timestamped local backups
 *.bak-*
+
+# tray icon preview (regenerate with gen-tray-icon.ps1 -Preview)
+badge-preview.png

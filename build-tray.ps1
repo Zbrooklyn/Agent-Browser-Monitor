@@ -6,9 +6,18 @@ if (-not $csc) { $csc = Get-ChildItem "C:\Windows\Microsoft.NET\Framework\v4*\cs
 if (-not $csc) { Write-Error "No C# compiler (csc.exe) found. Install the .NET Framework 4.x."; exit 1 }
 
 $dir = $PSScriptRoot
-& $csc.FullName /nologo /target:winexe `
-  /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Management.dll `
-  /out:"$dir\AgentBrowsers.exe" "$dir\AgentBrowsersTray.cs"
+
+# ensure the app icon exists (the 2x2 grid badge)
+if (-not (Test-Path "$dir\badge.ico")) {
+  powershell -ExecutionPolicy Bypass -File "$dir\gen-tray-icon.ps1"
+}
+$cscArgs = @('/nologo', '/target:winexe',
+  '/r:System.Windows.Forms.dll', '/r:System.Drawing.dll', '/r:System.Management.dll')
+if (Test-Path "$dir\badge.ico") { $cscArgs += "/win32icon:$dir\badge.ico" }
+$cscArgs += "/out:$dir\AgentBrowsers.exe"
+$cscArgs += "$dir\AgentBrowsersTray.cs"
+
+& $csc.FullName $cscArgs
 
 if ($LASTEXITCODE -eq 0) {
   Write-Host "Built $dir\AgentBrowsers.exe"

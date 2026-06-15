@@ -37,8 +37,8 @@ namespace AgentBrowsers
             GC.KeepAlive(mutex);
 
             Application.EnableVisualStyles();
-            upIcon = MakeDot(Color.FromArgb(62, 207, 142));     // phosphor green = up
-            downIcon = MakeDot(Color.FromArgb(130, 130, 138));  // grey = down / starting
+            upIcon = MakeBadge(true);     // 2x2 grid badge, phosphor-green tiles = up
+            downIcon = MakeBadge(false);  // grey tiles = down / starting
 
             tray = new NotifyIcon();
             tray.Icon = downIcon;
@@ -70,17 +70,45 @@ namespace AgentBrowsers
             return Path.GetDirectoryName(Application.ExecutablePath);
         }
 
-        static Icon MakeDot(Color c)
+        // App badge: dark rounded square with a 2x2 grid of tiles (the dashboard motif).
+        // Tiles are green when the server is up, grey when it is down.
+        static Icon MakeBadge(bool up)
         {
             Bitmap bmp = new Bitmap(32, 32);
             using (Graphics g = Graphics.FromImage(bmp))
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.Clear(Color.Transparent);
-                using (SolidBrush b = new SolidBrush(c))
-                    g.FillEllipse(b, 5, 5, 22, 22);
+                using (GraphicsPath bgp = Rounded(new Rectangle(1, 1, 30, 30), 7))
+                using (SolidBrush bg = new SolidBrush(Color.FromArgb(255, 18, 21, 28)))
+                    g.FillPath(bg, bgp);
+
+                Color tileColor = up ? Color.FromArgb(62, 207, 142) : Color.FromArgb(120, 124, 132);
+                int s = 11, gap = 2, x0 = 4, y0 = 4;
+                using (SolidBrush tb = new SolidBrush(tileColor))
+                {
+                    for (int r = 0; r < 2; r++)
+                        for (int c = 0; c < 2; c++)
+                        {
+                            Rectangle rect = new Rectangle(x0 + c * (s + gap), y0 + r * (s + gap), s, s);
+                            using (GraphicsPath tp = Rounded(rect, 2))
+                                g.FillPath(tb, tp);
+                        }
+                }
             }
             return Icon.FromHandle(bmp.GetHicon());
+        }
+
+        static GraphicsPath Rounded(Rectangle r, int rad)
+        {
+            GraphicsPath p = new GraphicsPath();
+            int d = rad * 2;
+            p.AddArc(r.X, r.Y, d, d, 180, 90);
+            p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            p.CloseFigure();
+            return p;
         }
 
         // Spawn (or respawn) the port guardian, which keeps grid.cjs bound to the port.

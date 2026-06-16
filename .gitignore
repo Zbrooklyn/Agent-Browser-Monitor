@@ -1,6 +1,7 @@
 # runtime logs
 *.log
 *.err
+logs/
 
 # local dev / scratch
 viewport-check/

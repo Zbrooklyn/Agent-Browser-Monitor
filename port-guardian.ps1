@@ -12,6 +12,10 @@ $ErrorActionPreference = "SilentlyContinue"
 $grid      = Join-Path $PSScriptRoot "grid.cjs"   # portable: resolves next to this script
 $node      = (Get-Command node).Source
 $tailscale = "C:\Program Files\Tailscale\tailscale.exe"
+$logDir = Join-Path $PSScriptRoot "logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+$outLog = Join-Path $logDir "grid.out.log"
+$errLog = Join-Path $logDir "grid.err.log"
 
 function Get-Listeners {
   Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
@@ -41,8 +45,10 @@ while ($true) {
       }
     }
     Start-Sleep -Milliseconds 500
-    # 2) (re)bind grid to the reserved port
-    Start-Process -FilePath $node -ArgumentList $grid, $BindHost, $Port -WindowStyle Hidden
+    # 2) (re)bind grid to the reserved port, capturing its output. Rotate the previous run's
+    #    logs first so the crash that caused this restart is preserved in *.prev.
+    foreach ($lf in @($outLog, $errLog)) { if (Test-Path $lf) { Move-Item $lf "$lf.prev" -Force -ErrorAction SilentlyContinue } }
+    Start-Process -FilePath $node -ArgumentList $grid, $BindHost, $Port -WindowStyle Hidden -RedirectStandardOutput $outLog -RedirectStandardError $errLog
     Start-Sleep -Seconds 2
     # 3) keep the PWA hostname pointed at the reserved port
     if (Test-Path $tailscale) {

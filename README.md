@@ -61,7 +61,9 @@ Agent Browsers turns the fleet into a glanceable grid that tells you which ones 
 ## Requirements
 
 - **Node.js 22+** — it uses the built-in `WebSocket` global to speak CDP (available
-  unflagged from Node 21; 22+ recommended). No other runtime.
+  unflagged from Node 21; 22+ recommended). No other runtime. *(The Windows tray app
+  auto-downloads a portable Node into your user folder on first run if none is installed —
+  no admin, no system change — so end users don't have to install anything.)*
 - **No dependencies** — nothing to `npm install`. It is a single `.cjs` file.
 - **Runs on Windows, macOS, and Linux.** Zero-config auto-discovery finds Chromium
   remote-debugging ports via PowerShell on Windows and `lsof` on macOS/Linux. On any OS
@@ -161,6 +163,10 @@ Auto-start at logon: drop a one-line `.vbs` in your Startup folder (`shell:start
 runs the exe — `CreateObject("WScript.Shell").Run "<path>\AgentBrowsers.exe", 0, False`.
 Because the guardian is tied to the tray, closing the tray (even via Task Manager) stops
 the server too — nothing keeps running without the icon.
+
+**No Node installed?** On first run the tray fetches a portable Node (~30MB) into
+`%LOCALAPPDATA%\AgentBrowsers\node` and uses that — no installer, no admin, and your
+system is untouched. A system Node, if present, is always preferred.
 
 > Design note: a tray icon needs an interactive logon session, so this starts at *login*,
 > not before it. A true before-login service would have to run headless with no icon — the

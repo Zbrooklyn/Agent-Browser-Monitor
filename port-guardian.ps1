@@ -10,8 +10,10 @@ param(
 )
 $ErrorActionPreference = "SilentlyContinue"
 $grid      = Join-Path $PSScriptRoot "grid.cjs"   # portable: resolves next to this script
-$node      = (Get-Command node).Source
 $tailscale = "C:\Program Files\Tailscale\tailscale.exe"
+$nodeUrl   = "https://nodejs.org/dist/v22.11.0/node-v22.11.0-win-x64.zip"   # portable Node, fetched once if none is installed
+$nodeDir   = Join-Path $env:LOCALAPPDATA "AgentBrowsers\node"
+$localNode = Join-Path $nodeDir "node.exe"
 $logDir = Join-Path $PSScriptRoot "logs"
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 $outLog = Join-Path $logDir "grid.out.log"
@@ -27,6 +29,25 @@ function Is-GridPid([int]$ProcId) {
 function GridIsOnPort {
   foreach ($c in Get-Listeners) { if (Is-GridPid $c.OwningProcess) { return $true } }
   return $false
+}
+# Find a usable node.exe: system install first, then a cached portable copy, else fetch the
+# portable Node zip once (no admin, no installer) into LocalAppData and cache node.exe there.
+function Resolve-Node {
+  $sys = (Get-Command node -ErrorAction SilentlyContinue).Source
+  if ($sys) { return $sys }
+  if (Test-Path $localNode) { return $localNode }
+  try {
+    New-Item -ItemType Directory -Force -Path $nodeDir | Out-Null
+    $zip = Join-Path $env:TEMP "abm-node.zip"
+    Invoke-WebRequest -Uri $nodeUrl -OutFile $zip -UseBasicParsing
+    $ex = Join-Path $env:TEMP "abm-node-ex"
+    Expand-Archive -Path $zip -DestinationPath $ex -Force
+    $found = Get-ChildItem $ex -Recurse -Filter node.exe | Select-Object -First 1
+    if ($found) { Copy-Item $found.FullName $localNode -Force }
+    Remove-Item $zip, $ex -Recurse -Force -ErrorAction SilentlyContinue
+  } catch {}
+  if (Test-Path $localNode) { return $localNode }
+  return $null
 }
 
 while ($true) {
@@ -47,12 +68,15 @@ while ($true) {
     Start-Sleep -Milliseconds 500
     # 2) (re)bind grid to the reserved port, capturing its output. Rotate the previous run's
     #    logs first so the crash that caused this restart is preserved in *.prev.
-    foreach ($lf in @($outLog, $errLog)) { if (Test-Path $lf) { Move-Item $lf "$lf.prev" -Force -ErrorAction SilentlyContinue } }
-    Start-Process -FilePath $node -ArgumentList $grid, $BindHost, $Port -WindowStyle Hidden -RedirectStandardOutput $outLog -RedirectStandardError $errLog
-    Start-Sleep -Seconds 2
-    # 3) keep the PWA hostname pointed at the reserved port
-    if (Test-Path $tailscale) {
-      & $tailscale serve --bg --https=443 ("http://127.0.0.1:{0}" -f $Port) 2>$null | Out-Null
+    $node = Resolve-Node
+    if ($node) {
+      foreach ($lf in @($outLog, $errLog)) { if (Test-Path $lf) { Move-Item $lf "$lf.prev" -Force -ErrorAction SilentlyContinue } }
+      Start-Process -FilePath $node -ArgumentList $grid, $BindHost, $Port -WindowStyle Hidden -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+      Start-Sleep -Seconds 2
+      # 3) keep the PWA hostname pointed at the reserved port
+      if (Test-Path $tailscale) {
+        & $tailscale serve --bg --https=443 ("http://127.0.0.1:{0}" -f $Port) 2>$null | Out-Null
+      }
     }
   }
   Start-Sleep -Seconds 5

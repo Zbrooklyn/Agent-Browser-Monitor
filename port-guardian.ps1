@@ -36,6 +36,8 @@ function Resolve-Node {
   $sys = (Get-Command node -ErrorAction SilentlyContinue).Source
   if ($sys) { return $sys }
   if (Test-Path $localNode) { return $localNode }
+  # "bring-your-own-Node" bundle ships a no-node-fetch.flag marker: never download, just use a system Node
+  if (Test-Path (Join-Path $PSScriptRoot "no-node-fetch.flag")) { return $null }
   try {
     New-Item -ItemType Directory -Force -Path $nodeDir | Out-Null
     $zip = Join-Path $env:TEMP "abm-node.zip"

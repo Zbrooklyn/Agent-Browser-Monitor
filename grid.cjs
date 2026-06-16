@@ -12,6 +12,7 @@ const { execFile } = require('child_process');
 // ---- config (flags first, then env, then defaults) -------------------------
 const BIND_HOST = process.argv[2] || process.env.HOST || '127.0.0.1';
 const BIND_PORT = parseInt(process.argv[3] || process.env.PORT || '8090', 10);
+const TOKEN = process.env.TOKEN || '';            // optional shared secret: when set, the dashboard + control require it
 const TILE = { format: 'jpeg', quality: +(process.env.TILE_Q || 55), maxWidth: +(process.env.TILE_W || 800),  maxHeight: +(process.env.TILE_H || 500),  everyNthFrame: 1 }; // cheap tile frames
 const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +(process.env.HQ_W   || 1920), maxHeight: +(process.env.HQ_H   || 1200), everyNthFrame: 1 }; // crisp focus frames
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
@@ -239,7 +240,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-14h-scrollfeel';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-16-auth';                                     // single source of truth for the build id (shown in UI + used as the SW version)
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -941,9 +942,44 @@ self.addEventListener('fetch',e=>{const req=e.request;if(req.method!=='GET')retu
   if(req.mode==='navigate'){e.respondWith((async()=>{try{return await fetch(req);}catch(_){const c=await caches.open(SHELL);return (await c.match('/'))||Response.error();}})());return;}
   e.respondWith((async()=>{const c=await caches.open(SHELL);const hit=await c.match(req);if(hit)return hit;try{const r=await fetch(req);if(r&&r.ok)c.put(req,r.clone());return r;}catch(_){return hit||Response.error();}})());});`;
 
+// Control is real input, so guard /api/input. The dangerous vector is a malicious web page
+// open inside a watched browser scripting fetch() at the dashboard; such a request carries a
+// public Origin, so we allow only local/tailnet origins (loopback, *.ts.net, tailscale CGNAT,
+// private LAN). No Origin header (non-browser client) is allowed; set TOKEN to gate those too.
+function localOrigin(req) {
+  const o = req.headers.origin; if (!o) return true;
+  let h; try { h = new URL(o).hostname; } catch { return false; }
+  if (h === '127.0.0.1' || h === 'localhost' || h === '::1') return true;
+  if (/\.ts\.net$/i.test(h)) return true;                                  // tailscale serve hostnames
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return true;     // tailscale CGNAT 100.64.0.0/10
+  if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true; // private LAN
+  return false;
+}
+function reqToken(req) {
+  try { const q = new URL(req.url, 'http://x').searchParams.get('token'); if (q) return q; } catch {}
+  if (req.headers['x-token']) return req.headers['x-token'];
+  const m = (req.headers.cookie || '').match(/(?:^|;\s*)abm_token=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function authed(req) { return !TOKEN || reqToken(req) === TOKEN; }
+
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
+  // optional shared-secret gate: ?token=… sets a year-long cookie, then the device is unlocked
+  if (TOKEN) {
+    let q = ''; try { q = new URL(req.url, 'http://x').searchParams.get('token') || ''; } catch {}
+    if (q === TOKEN) {
+      res.writeHead(302, { 'Set-Cookie': `abm_token=${encodeURIComponent(TOKEN)}; Path=/; Max-Age=31536000; SameSite=Lax`, 'Location': u });
+      res.end(); return;
+    }
+    if (!authed(req)) {
+      res.writeHead(401, { 'Content-Type': 'text/html' });
+      res.end('<meta name=viewport content="width=device-width,initial-scale=1"><body style="font:16px system-ui;background:#0f1115;color:#e6e6ea;padding:42px"><h2>Agent Browsers</h2><p>This dashboard is locked. Open it once with <code>?token=YOUR_TOKEN</code> to unlock this device.</p></body>');
+      return;
+    }
+  }
   if (req.method === 'POST' && u === '/api/input') {     // Path A: light click/type into the focused session
+    if (!localOrigin(req)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"ok":false,"err":"origin"}'); return; }
     let body = ''; req.on('data', c => { body += c; if (body.length > 16384) req.destroy(); });
     req.on('end', () => { let j = null; try { j = JSON.parse(body); } catch {} const ok = !!(j && dispatchInput(j)); res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(`{"ok":${ok}}`); });
     return;

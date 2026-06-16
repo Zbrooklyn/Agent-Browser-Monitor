@@ -114,6 +114,10 @@ detached (surviving the shell), set up the tailnet proxy, and print your phone U
 
 ### Keep it always-on (port guardian)
 
+> **Windows-first.** The always-on tooling below — the guardian, the tray app, auto-start —
+> is Windows-only today. The core dashboard (`node grid.cjs`) runs anywhere; on macOS/Linux
+> you'd keep it alive with your own `launchd`/`systemd` unit.
+
 If you rely on the dashboard at a fixed port/URL, `port-guardian.ps1` makes the port
 **stay yours**. It is a tiny supervisor loop that:
 
@@ -173,6 +177,7 @@ node grid.cjs [host] [port]
 | Env | Default | Meaning |
 | --- | --- | --- |
 | `HOST` / `PORT` | `127.0.0.1` / `8090` | bind address |
+| `TOKEN` | _(none)_ | optional shared secret — when set, the dashboard + control require `?token=…` once per device (see Security) |
 | `PORTS` | _(auto-detect)_ | skip auto-discovery and watch exactly these debug ports, e.g. `PORTS=9222,9223` |
 | `TILE_Q` / `TILE_W` / `TILE_H` | `55` / `800` / `500` | grid tile JPEG quality + max size |
 | `HQ_Q` / `HQ_W` / `HQ_H` | `82` / `1920` / `1200` | focused-view JPEG quality + max size |
@@ -191,8 +196,15 @@ node grid.cjs [host] [port]
 ## Security
 
 - **Control is real input.** With Control enabled the dashboard sends live clicks,
-  keystrokes, and scrolls to the browser over CDP. The stream has **no authentication**,
-  so anyone who can reach the URL can drive your browsers — keep it private.
+  keystrokes, and scrolls to the browser over CDP.
+- **Origin-guarded (always on).** The control endpoint rejects requests whose `Origin` is a
+  public website, so a malicious page open *inside a watched browser* can't script
+  `fetch()` against the dashboard and drive your fleet. Only local/tailnet origins
+  (loopback, `*.ts.net`, tailscale CGNAT, private LAN) are accepted.
+- **Optional shared secret.** Set `TOKEN=…` to lock the whole dashboard *and* control
+  behind a token — open it once per device with `?token=YOUR_TOKEN` (it sets a long-lived
+  cookie). Recommended if your tailnet has devices/users you don't fully trust. Without it,
+  viewing is open and only control is origin-guarded.
 - Binds to `127.0.0.1`. Nothing is exposed until you choose to. A tailnet via
   `tailscale serve` is the recommended private option. **Never put it on the public
   internet.**

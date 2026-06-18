@@ -668,7 +668,12 @@ fimg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;if(focus
   if(controlOn&&ptrMode==='trackpad'){                                  // trackpad: 1 finger = move cursor, 2 fingers = scroll (no pinch-zoom)
     if(pts.size>=2){const p=[...pts.values()];const mx=(p[0].x+p[1].x)/2,my=(p[0].y+p[1].y)/2;if(lastMid)scrollDrag(mx,my,mx-lastMid.x,my-lastMid.y);lastMid={x:mx,y:my};return;}
     const dx=e.clientX-prev.x,dy=e.clientY-prev.y;if(Math.abs(dx)+Math.abs(dy)>1.5)tpMoved=true;moveCursor(dx,dy);return;}
-  if(pts.size===2&&pinch){const p=[...pts.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);z=Math.max(1,Math.min(5,pinch.z*d/pinch.d));if(z===1){tx=0;ty=0;}applyZoom();}
+  if(pts.size===2&&pinch){const p=[...pts.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
+    const zNew=Math.max(1,Math.min(5,pinch.z*d/pinch.d));
+    const Fx=(p[0].x+p[1].x)/2,Fy=(p[0].y+p[1].y)/2;        // zoom focal point = the pinch midpoint
+    const r=fimg.getBoundingClientRect();                    // current (transformed) rect; transform-origin is 0 0
+    tx+=(Fx-r.left)*(1-zNew/z);ty+=(Fy-r.top)*(1-zNew/z);    // shift origin so the content under the fingers stays put
+    z=zNew;if(z===1){tx=0;ty=0;}applyZoom();}
   else if(pts.size===1&&z>1){tx+=e.clientX-prev.x;ty+=e.clientY-prev.y;applyZoom();}
   else if(controlOn&&pts.size===1){scrollDrag(e.clientX,e.clientY,e.clientX-prev.x,e.clientY-prev.y);}});
 function liftPtr(e){

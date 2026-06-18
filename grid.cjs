@@ -252,6 +252,7 @@ const ICOPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const ICOMOVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
 const ICODOTS = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const ICOCURSOR = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M5 2.5l14.5 8.2-6.1 1.2-1 .2-.5.9-2.9 5.6z"/></svg>'; // arrow cursor — "take control"
+const ICOTOUCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 11V8.5a1.5 1.5 0 0 1 3 0V11"/><path d="M15 11.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a7 7 0 0 1-5.3-2.4L4 14.5s1.2-1.2 2.6-.2L8 15.3V9.5a1.5 1.5 0 0 1 3 0V11"/></svg>'; // finger-tap — direct-touch pointer mode
 const ICOKEYB = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>';
 const ICOEXP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
 const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>';
@@ -435,6 +436,11 @@ body.offline #empty .emsg-off{display:block}
 #focus.ctl #fimg{cursor:crosshair}
 #fcursor{position:absolute;left:-99px;top:-99px;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--live);border-radius:50%;box-shadow:0 0 12px #3ecf8eaa;pointer-events:none;z-index:53;opacity:0;transform:scale(.6);transition:opacity .2s,transform .2s}
 #fcursor.show{opacity:1;transform:scale(1)}
+#fcursor i{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--live);box-shadow:0 0 6px #3ecf8e}  /* precise center point for trackpad mode */
+#fcursor.clicking{transform:scale(1.4);background:#3ecf8e3a}                                  /* quick pulse on a trackpad click */
+#fpmode{display:none;width:46px;padding:11px 0;justify-content:center}                        /* icon-only square: a 3rd text pill overflows the bar at phone width */
+#fpmode span{display:none}                                                                     /* the icon (finger=touch · arrow=trackpad) carries the mode; green tint = trackpad active */
+#focus.ctl #fpmode{display:inline-flex}                                                       /* pointer-mode toggle only while controlling */
 #ftype{position:absolute;left:-9999px;top:0;width:8px;height:8px;opacity:0;border:0;padding:0}
 #fctlbar{position:absolute;right:13px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;z-index:54;transition:opacity .25s}
 #fctlbar button{align-items:center;gap:7px;padding:11px 15px;border:none;border-radius:13px;color:#fff;font-size:14px;font-weight:650;cursor:pointer}
@@ -523,7 +529,7 @@ body.embed #focus{display:block}
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
 <div id="empty">${MARK}<div class="emsg"><h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div><div class="emsg-off"><h2>Can&rsquo;t reach the dashboard</h2><p>The server looks offline. This reconnects automatically the moment it&rsquo;s back.</p></div></div>
-<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"></div></div>
+<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fpmode" class="fbtn glass" aria-label="Pointer mode" title="Switch touch / trackpad pointer">${ICOTOUCH}<span>Touch</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"><i></i></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
@@ -652,27 +658,45 @@ function applyZoom(){fimg.style.transform=focus.classList.contains('rot')?('tran
 function resetZoom(){z=1;tx=0;ty=0;applyZoom();}
 function toggleRot(){focus.classList.toggle('rot');resetZoom();buzz();}   // fill the glass: rotate the view 90° so a landscape page fills a portrait phone
 fimg.addEventListener('pointerdown',e=>{cancelMomentum();vel.x=0;vel.y=0;vel.t=Date.now();pts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{fimg.setPointerCapture(e.pointerId);}catch(_){}
-  if(pts.size===1){swipe={x:e.clientX,y:e.clientY,t:Date.now()};multi=false;}
-  if(pts.size===2){multi=true;const p=[...pts.values()];pinch={d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),z};}});
+  if(pts.size===1){swipe={x:e.clientX,y:e.clientY,t:Date.now()};multi=false;tpMoved=false;}
+  if(pts.size===2){multi=true;const p=[...pts.values()];if(controlOn&&ptrMode==='trackpad'){lastMid={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};}else{pinch={d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),z};}}});
 fimg.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;if(focus.classList.contains('rot'))return;const prev=pts.get(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(controlOn&&ptrMode==='trackpad'){                                  // trackpad: 1 finger = move cursor, 2 fingers = scroll (no pinch-zoom)
+    if(pts.size>=2){const p=[...pts.values()];const mx=(p[0].x+p[1].x)/2,my=(p[0].y+p[1].y)/2;if(lastMid)scrollDrag(mx,my,mx-lastMid.x,my-lastMid.y);lastMid={x:mx,y:my};return;}
+    const dx=e.clientX-prev.x,dy=e.clientY-prev.y;if(Math.abs(dx)+Math.abs(dy)>1.5)tpMoved=true;moveCursor(dx,dy);return;}
   if(pts.size===2&&pinch){const p=[...pts.values()];const d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);z=Math.max(1,Math.min(5,pinch.z*d/pinch.d));if(z===1){tx=0;ty=0;}applyZoom();}
   else if(pts.size===1&&z>1){tx+=e.clientX-prev.x;ty+=e.clientY-prev.y;applyZoom();}
   else if(controlOn&&pts.size===1){scrollDrag(e.clientX,e.clientY,e.clientX-prev.x,e.clientY-prev.y);}});
 function liftPtr(e){
   // single-finger flick on an un-zoomed image: ←/→ switch session, swipe-down closes
   if(pts.size===1&&!multi&&z===1&&swipe){const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y,dt=Date.now()-swipe.t;
-    if(Math.abs(dx)<10&&Math.abs(dy)<10){controlOn?clickAt(e.clientX,e.clientY):toggleChrome();}   // control mode: tap=click; else tap toggles chrome
-    else if(controlOn&&!focus.classList.contains('rot')){startMomentum();}   // control-mode drag: flick coasts after lift
+    if(controlOn&&ptrMode==='trackpad'){                              // trackpad: a tap (no drag) clicks at the cursor; a drag only repositioned it
+      if(!tpMoved&&Math.abs(dx)<10&&Math.abs(dy)<10)clickAtCursor();}
+    else if(Math.abs(dx)<10&&Math.abs(dy)<10){controlOn?clickAt(e.clientX,e.clientY):toggleChrome();}   // touch mode: tap=click; else tap toggles chrome
+    else if(controlOn&&!focus.classList.contains('rot')){startMomentum();}   // touch-mode drag: flick coasts after lift
     else if(!controlOn&&!focus.classList.contains('rot')){           // swipe nav/close only in watch mode, not rotated
       if(dt<600&&Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.3){step(dx<0?1:-1);}
       else if(dt<600&&dy>90&&dy>Math.abs(dx)){buzz();nav('/');}}}
-  pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(pts.size===0)swipe=null;}
+  pts.delete(e.pointerId);if(pts.size<2){pinch=null;lastMid=null;}if(pts.size===0)swipe=null;}
 fimg.addEventListener('pointerup',liftPtr);fimg.addEventListener('pointercancel',liftPtr);
 fimg.addEventListener('dblclick',()=>{z>1?resetZoom():(z=2,applyZoom());});
 
 // ---------- Path A: take control (tap=click · drag=scroll · Type=keyboard) ----------
-let controlOn=false,vel={x:0,y:0,t:0},momRAF=0; const fctl=document.getElementById('fctl'),ftype=document.getElementById('ftype'),fcursor=document.getElementById('fcursor'),ftypebtn=document.getElementById('ftypebtn'),wq={dx:0,dy:0,t:0};
-function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');}else{if(ftype)ftype.blur();if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}
+let controlOn=false,vel={x:0,y:0,t:0},momRAF=0; const fctl=document.getElementById('fctl'),ftype=document.getElementById('ftype'),fcursor=document.getElementById('fcursor'),ftypebtn=document.getElementById('ftypebtn'),fpmode=document.getElementById('fpmode'),wq={dx:0,dy:0,t:0};
+// pointer sub-mode: 'touch' = tap lands a click where you tap (direct); 'trackpad' = one-finger drag nudges a persistent cursor and a tap clicks at it (RDP mouse-mode). Remembered across sessions.
+let ptrMode=(()=>{try{return localStorage.getItem('ptrMode')||'touch';}catch(_){return 'touch';}})();let curX=0,curY=0,tpMoved=false,lastMid=null;
+// the page is contain-fitted; the cursor must stay on the real image, not the letterbox — these bounds clamp it
+function imgContentRect(){const b=fimg.getBoundingClientRect();if(!fimg.naturalWidth||!fimg.naturalHeight)return{left:b.left,top:b.top,right:b.right,bottom:b.bottom};const ar=fimg.naturalWidth/fimg.naturalHeight,br=b.width/b.height;let dw,dh,ox,oy;if(ar>br){dw=b.width;dh=b.width/ar;ox=0;oy=(b.height-dh)/2;}else{dh=b.height;dw=b.height*ar;oy=0;ox=(b.width-dw)/2;}return{left:b.left+ox,top:b.top+oy,right:b.left+ox+dw,bottom:b.top+oy+dh};}
+function placeCursor(){if(fcursor){fcursor.style.left=curX+'px';fcursor.style.top=curY+'px';}}
+function centerCursor(){const r=imgContentRect();curX=(r.left+r.right)/2;curY=(r.top+r.bottom)/2;placeCursor();}
+function showCursor(on){if(fcursor)fcursor.classList.toggle('show',on);}
+function moveCursor(dx,dy){const A=1.6;const r=imgContentRect();curX=Math.max(r.left,Math.min(r.right,curX+dx*A));curY=Math.max(r.top,Math.min(r.bottom,curY+dy*A));placeCursor();showCursor(true);}
+function clickAtCursor(){const f=imgFrac(curX,curY);if(!f)return;buzz(14);if(fcursor){fcursor.classList.add('clicking');setTimeout(()=>fcursor&&fcursor.classList.remove('clicking'),200);}sendInput({kind:'click',xf:f.xf,yf:f.yf});}
+function syncPmodeBtn(){if(fpmode){fpmode.innerHTML=(ptrMode==='trackpad'?'${ICOCURSOR}<span>Trackpad</span>':'${ICOTOUCH}<span>Touch</span>');fpmode.classList.toggle('on',ptrMode==='trackpad');}}
+function setPtrMode(m){ptrMode=m;try{localStorage.setItem('ptrMode',m);}catch(_){}focus.classList.toggle('tpad',m==='trackpad');syncPmodeBtn();if(controlOn&&m==='trackpad'){centerCursor();showCursor(true);}else{showCursor(false);}buzz(10);}
+if(fpmode)fpmode.onclick=e=>{e.stopPropagation();setPtrMode(ptrMode==='trackpad'?'touch':'trackpad');};
+syncPmodeBtn();
+function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');if(ptrMode==='trackpad'){focus.classList.add('tpad');centerCursor();showCursor(true);}}else{if(ftype)ftype.blur();lastMid=null;if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}
 if(fctl)fctl.onclick=e=>{e.stopPropagation();setControl(!controlOn);};
 // map a client point to a 0..1 fraction within the contain-fitted image (null = on the letterbox)
 function imgFrac(cx,cy){if(!fimg.naturalWidth||!fimg.naturalHeight)return null;const b=fimg.getBoundingClientRect();const ar=fimg.naturalWidth/fimg.naturalHeight,br=b.width/b.height;let dw,dh,ox,oy;if(ar>br){dw=b.width;dh=b.width/ar;ox=0;oy=(b.height-dh)/2;}else{dh=b.height;dw=b.height*ar;oy=0;ox=(b.width-dw)/2;}const xf=(cx-b.left-ox)/dw,yf=(cy-b.top-oy)/dh;if(xf<0||xf>1||yf<0||yf>1)return null;return{xf,yf};}

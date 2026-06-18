@@ -259,7 +259,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-16-auth';                                     // single source of truth for the build id (shown in UI + used as the SW version)
+const BUILD = '2026-06-18-control';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -455,7 +455,7 @@ body.offline #empty .emsg-off{display:block}
 #fnav #fzap{display:none}                /* drop the redundant jump-to-active to slim the pager (beats #fnav button) */
 #focus.idle #fctlbar{opacity:0;pointer-events:none}
 /* control mode: the floating pill-cluster becomes a full-width solid toolbar so the page can dock above it, never under it */
-#focus.ctl #fctlbar{left:0;right:0;bottom:0;justify-content:center;gap:10px;padding:11px 12px calc(11px + env(safe-area-inset-bottom));background:#0d0d10f2;border-top:1px solid var(--line)}
+#focus.ctl #fctlbar{left:0;right:0;bottom:var(--kb,0px);justify-content:center;gap:10px;padding:11px 12px calc(11px + env(safe-area-inset-bottom));background:#0d0d10f2;border-top:1px solid var(--line);transition:bottom .18s ease}  /* --kb lifts the toolbar above the on-screen keyboard */
 #fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
@@ -700,8 +700,19 @@ function syncPmodeBtn(){if(fpmode){fpmode.innerHTML=(ptrMode==='trackpad'?'${ICO
 function setPtrMode(m){ptrMode=m;try{localStorage.setItem('ptrMode',m);}catch(_){}focus.classList.toggle('tpad',m==='trackpad');syncPmodeBtn();if(controlOn&&m==='trackpad'){centerCursor();showCursor(true);}else{showCursor(false);}buzz(10);}
 if(fpmode)fpmode.onclick=e=>{e.stopPropagation();setPtrMode(ptrMode==='trackpad'?'touch':'trackpad');};
 syncPmodeBtn();
-// measure the real bar heights (safe-area + content) into CSS vars so the docked page sits exactly between them on any device
-function layoutCtl(){if(!controlOn)return;const tb=document.getElementById('fbar'),bb=document.getElementById('fctlbar');const top=(tb&&tb.offsetHeight)||58,bot=(bb&&bb.offsetHeight)||84;focus.style.setProperty('--ctop',top+'px');focus.style.setProperty('--cbot',bot+'px');}
+// measure the real bar heights (safe-area + content) AND the on-screen keyboard into CSS vars, so the docked page +
+// toolbar always sit in the space that's actually visible — never hidden behind the keyboard (the RDP "keep what you're
+// typing into in view" behavior). visualViewport reports the keyboard; without it (desktop) kb is 0 and nothing changes.
+function layoutCtl(){if(!controlOn)return;
+  const vv=window.visualViewport;
+  const kb=vv?Math.max(0,Math.round(innerHeight-vv.height-vv.offsetTop)):0;   // height the keyboard steals from the bottom
+  const tb=document.getElementById('fbar'),bb=document.getElementById('fctlbar');
+  const top=(tb&&tb.offsetHeight)||58,barH=(bb&&bb.offsetHeight)||84;
+  focus.style.setProperty('--kb',kb+'px');                                    // lifts the toolbar above the keyboard
+  focus.style.setProperty('--ctop',top+'px');
+  focus.style.setProperty('--cbot',(barH+kb)+'px');                           // page docks above the toolbar, which is above the keyboard
+}
+if(window.visualViewport){visualViewport.addEventListener('resize',()=>{if(controlOn)requestAnimationFrame(layoutCtl);});visualViewport.addEventListener('scroll',()=>{if(controlOn)requestAnimationFrame(layoutCtl);});}
 function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');if(ptrMode==='trackpad')focus.classList.add('tpad');
     requestAnimationFrame(()=>{layoutCtl();if(controlOn&&ptrMode==='trackpad'){centerCursor();showCursor(true);}});   // dock the page, THEN center the cursor in the docked box
   }else{if(ftype)ftype.blur();lastMid=null;if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}

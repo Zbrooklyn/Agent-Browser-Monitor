@@ -433,7 +433,9 @@ body.offline #empty .emsg-off{display:block}
 #focus.rot #fimg{inset:auto;top:50%;left:50%;width:100vh;height:100vw;transform-origin:center}
 .fbtn.on{color:var(--live);background:#3ecf8e26;box-shadow:inset 0 0 0 1px #3ecf8e66}
 /* Path A: take-control mode — tap=click, drag=scroll, Type pill summons the keyboard */
-#focus.ctl #fimg{cursor:crosshair}
+/* dock the page BETWEEN the bars while controlling so the chrome never covers the page top/bottom (insets measured live into --ctop/--cbot) */
+#focus.ctl #fimg{cursor:crosshair;top:var(--ctop,58px);bottom:auto;height:calc(100% - var(--ctop,58px) - var(--cbot,84px))}  /* <img> is replaced: top+bottom+height:auto shrinks it — use explicit height so contain centers the page in the docked gap */
+#focus.ctl #fbar{background:#0d0d10f2;border-bottom:1px solid var(--line)}                     /* solid top status bar (no gradient) so the gutter reads intentional */
 #fcursor{position:absolute;left:-99px;top:-99px;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--live);border-radius:50%;box-shadow:0 0 12px #3ecf8eaa;pointer-events:none;z-index:53;opacity:0;transform:scale(.6);transition:opacity .2s,transform .2s}
 #fcursor.show{opacity:1;transform:scale(1)}
 #fcursor i{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--live);box-shadow:0 0 6px #3ecf8e}  /* precise center point for trackpad mode */
@@ -452,6 +454,8 @@ body.offline #empty .emsg-off{display:block}
 #focus.ctl #fnav{display:none}          /* pager hidden while controlling — bottom belongs to the control pills */
 #fnav #fzap{display:none}                /* drop the redundant jump-to-active to slim the pager (beats #fnav button) */
 #focus.idle #fctlbar{opacity:0;pointer-events:none}
+/* control mode: the floating pill-cluster becomes a full-width solid toolbar so the page can dock above it, never under it */
+#focus.ctl #fctlbar{left:0;right:0;bottom:0;justify-content:center;gap:10px;padding:11px 12px calc(11px + env(safe-area-inset-bottom));background:#0d0d10f2;border-top:1px solid var(--line)}
 #fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
@@ -696,7 +700,12 @@ function syncPmodeBtn(){if(fpmode){fpmode.innerHTML=(ptrMode==='trackpad'?'${ICO
 function setPtrMode(m){ptrMode=m;try{localStorage.setItem('ptrMode',m);}catch(_){}focus.classList.toggle('tpad',m==='trackpad');syncPmodeBtn();if(controlOn&&m==='trackpad'){centerCursor();showCursor(true);}else{showCursor(false);}buzz(10);}
 if(fpmode)fpmode.onclick=e=>{e.stopPropagation();setPtrMode(ptrMode==='trackpad'?'touch':'trackpad');};
 syncPmodeBtn();
-function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');if(ptrMode==='trackpad'){focus.classList.add('tpad');centerCursor();showCursor(true);}}else{if(ftype)ftype.blur();lastMid=null;if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}
+// measure the real bar heights (safe-area + content) into CSS vars so the docked page sits exactly between them on any device
+function layoutCtl(){if(!controlOn)return;const tb=document.getElementById('fbar'),bb=document.getElementById('fctlbar');const top=(tb&&tb.offsetHeight)||58,bot=(bb&&bb.offsetHeight)||84;focus.style.setProperty('--ctop',top+'px');focus.style.setProperty('--cbot',bot+'px');}
+function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');if(ptrMode==='trackpad')focus.classList.add('tpad');
+    requestAnimationFrame(()=>{layoutCtl();if(controlOn&&ptrMode==='trackpad'){centerCursor();showCursor(true);}});   // dock the page, THEN center the cursor in the docked box
+  }else{if(ftype)ftype.blur();lastMid=null;if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}
+addEventListener('resize',()=>{if(controlOn)requestAnimationFrame(layoutCtl);});                 // keyboard open / rotate / bar reflow re-docks the page
 if(fctl)fctl.onclick=e=>{e.stopPropagation();setControl(!controlOn);};
 // map a client point to a 0..1 fraction within the contain-fitted image (null = on the letterbox)
 function imgFrac(cx,cy){if(!fimg.naturalWidth||!fimg.naturalHeight)return null;const b=fimg.getBoundingClientRect();const ar=fimg.naturalWidth/fimg.naturalHeight,br=b.width/b.height;let dw,dh,ox,oy;if(ar>br){dw=b.width;dh=b.width/ar;ox=0;oy=(b.height-dh)/2;}else{dh=b.height;dw=b.height*ar;oy=0;ox=(b.width-dw)/2;}const xf=(cx-b.left-ox)/dw,yf=(cy-b.top-oy)/dh;if(xf<0||xf>1||yf<0||yf>1)return null;return{xf,yf};}

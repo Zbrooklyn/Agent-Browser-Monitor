@@ -119,15 +119,22 @@ function connect(s) {
   try {
     const ws = new WebSocket(s.wsUrl); s.ws = ws; let id = 0;
     const send = (m, p = {}) => { try { ws.send(JSON.stringify({ id: ++id, method: m, params: p })); } catch {} };
+    s.send = send;   // exposed so the idle-recapture sweep can re-seed a stalled/blank tile
     // focus-emulation + active lifecycle keep rAF/animations running even though these windows are backgrounded/occluded
     // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
-    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); };
+    // captureScreenshot seed: a static / just-opened page emits NO screencast frames, so without a seed the tile is blank until something moves
+    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.method === 'Page.screencastFrame') {
         send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
         s.frames++; s.lastFrame = m.params.data; s.lastSentAt = Date.now(); s.lastPaintAt = Date.now();
         feedSend(s.id, m.params.data);
+      }
+      // captureScreenshot result — re-seeds a non-painting tile so it never goes blank/frozen. Deliberately does NOT
+      // touch lastPaintAt, so the idle sweep keeps re-capturing a still page (~0.8fps) and recovers a stalled screencast.
+      else if (m.id !== undefined && m.result && typeof m.result.data === 'string') {
+        s.lastFrame = m.result.data; s.lastSentAt = Date.now(); feedSend(s.id, m.result.data);
       }
     };
     ws.onclose = () => { s.ws = null; };
@@ -203,6 +210,13 @@ setInterval(() => {
   for (const s of sessions.values()) { if (s.lastFrame && feedClients.size && now - s.lastSentAt >= FLOOR_MS) { s.lastSentAt = now; feedSend(s.id, s.lastFrame); } }
   for (const h of hq.values()) { if (h.lastFrame && h.subs.size && now - h.lastSentAt >= FLOOR_MS) { h.lastSentAt = now; const pl = `data: ${h.lastFrame}\n\n`; for (const c of h.subs) { try { c.write(pl); } catch {} } } }
 }, FLOOR_MS);
+// ---- idle re-capture: any tile that stopped painting (static page, post-navigation, stalled screencast) gets a fresh
+//      screenshot so it never blanks or freezes — mirrors the focus stream's capT. Only runs while someone is watching.
+setInterval(() => {
+  if (!feedClients.size) return;
+  const now = Date.now();
+  for (const s of sessions.values()) { if (s.ws && s.send && now - s.lastPaintAt > 1200) s.send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); }
+}, 1300);
 refresh(); setInterval(refresh, 5000);
 
 // ---- session state (for alerting; rendered in Pass 2) ----------------------

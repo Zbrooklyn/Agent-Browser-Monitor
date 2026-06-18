@@ -11,6 +11,8 @@ mockup.html
 # superseded single-session prototype + internal planning notes (kept local, not published)
 relay.cjs
 ROADMAP.md
+PLAN.md
+loop.md
 
 # node
 node_modules/

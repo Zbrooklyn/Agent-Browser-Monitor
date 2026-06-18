@@ -16,6 +16,7 @@ const TOKEN = process.env.TOKEN || '';            // optional shared secret: whe
 const TILE = { format: 'jpeg', quality: +(process.env.TILE_Q || 55), maxWidth: +(process.env.TILE_W || 800),  maxHeight: +(process.env.TILE_H || 500),  everyNthFrame: 1 }; // cheap tile frames
 const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +(process.env.HQ_W   || 1920), maxHeight: +(process.env.HQ_H   || 1200), everyNthFrame: 1 }; // crisp focus frames
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
+const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
 const STUCK_MS = +(process.env.STUCK_MS || 90000); // no visual change while live => "stuck"
 
 const sessions = new Map(); // port -> { port, id, title, url, wsUrl, ws, lastFrame, lastSentAt, lastPaintAt, frames, tabs }
@@ -128,8 +129,11 @@ function connect(s) {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.method === 'Page.screencastFrame') {
         send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
-        s.frames++; s.lastFrame = m.params.data; s.lastSentAt = Date.now(); s.lastPaintAt = Date.now();
-        feedSend(s.id, m.params.data);
+        const now = Date.now();
+        s.frames++; s.lastFrame = m.params.data; s.lastPaintAt = now;   // always keep the freshest frame + paint clock
+        // per-tile rate-cap: forward at most ~12.5 fps. Skipped frames still live in lastFrame, so the FLOOR re-send
+        // (and idle-recapture) carry the latest image within FLOOR_MS — the last frame after motion stops is never lost.
+        if (now - s.lastSentAt >= TILE_MIN_MS) { s.lastSentAt = now; feedSend(s.id, m.params.data); }
       }
       // captureScreenshot result — re-seeds a non-painting tile so it never goes blank/frozen. Deliberately does NOT
       // touch lastPaintAt, so the idle sweep keeps re-capturing a still page (~0.8fps) and recovers a stalled screencast.

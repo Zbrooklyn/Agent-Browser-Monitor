@@ -246,6 +246,16 @@ function stateOf(s) {
 // needs you = a hung page, or a URL/title that looks like it wants a human (login / captcha / 2FA / auth / consent)
 const NEEDS_RE = /login|sign[-_ ]?in|signin|log[-_ ]?in|password|captcha|recaptcha|challenge|verif|two[-_ ]?factor|2fa|one[-_ ]?time[-_ ]?code|\botp\b|accounts\.google|\/oauth|\/auth\b|authorize|consent|are you (a )?human/i;
 function needsAttention(s) { return stateOf(s) === 'stuck' || NEEDS_RE.test(((s.url || '') + ' ' + (s.title || ''))); }
+// close (kill) a watched session: Page.close over its own CDP socket, plus the documented HTTP close as a fallback
+function killSession(slug) {
+  const s = sessionBySlug(slug);
+  if (!s) return false;
+  try { if (s.ws && s.send) s.send('Page.close'); } catch {}
+  try { const tid = ((s.wsUrl || '').match(/\/devtools\/page\/([^/?]+)/) || [])[1]; if (tid) fetch(`http://127.0.0.1:${s.port}/json/close/${tid}`).catch(() => {}); } catch {}
+  try { s.ws && s.ws.close(); } catch {}
+  sessions.delete(s.port);   // drop the tile now so it vanishes on the next poll; refresh() re-adds one only if that port still has another page
+  return true;
+}
 
 const MARK = '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="2.2" fill="#3ecf8e"/><rect x="13" y="2" width="9" height="9" rx="2.2" fill="#3a3a40"/><rect x="2" y="13" width="9" height="9" rx="2.2" fill="#3a3a40"/><rect x="13" y="13" width="9" height="9" rx="2.2" fill="#3a3a40"/></svg>';
 const ICO1 = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2.2"/></svg>';
@@ -273,7 +283,8 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-19-pointer';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
+const ICOPOWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>'; // power — close/kill a session
+const BUILD = '2026-06-19-kill';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -503,6 +514,8 @@ body.offline #empty .emsg-off{display:block}
 #fmenu .pinrow svg{fill:currentColor;stroke:none;opacity:1}
 #fmenu .pinrow.on{color:#e8c66a}
 #fmenu .sep{height:1px;background:#ffffff14;margin:4px 8px;padding:0}
+#fmenu button.danger{color:#e3786f}
+#fmenu button.danger:active{background:#e3786f22}
 #fnav{position:absolute;left:13px;bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:2px;align-items:center;border-radius:13px;padding:4px;z-index:52;transition:opacity .25s}  /* left-anchored so it never collides with the right-anchored control pills */
 #fnav button{width:48px;height:42px;border:none;background:transparent;color:#fff;font-size:21px;cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center}
 #fnav button:active{background:#ffffff22}
@@ -553,7 +566,7 @@ body.embed #focus{display:block}
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
 <div id="empty">${MARK}<div class="emsg"><h2>No agent browsers detected</h2><p>Launch a Playwright or pool browser on this machine and it appears here automatically.</p></div><div class="emsg-off"><h2>Can&rsquo;t reach the dashboard</h2><p>The server looks offline. This reconnects automatically the moment it&rsquo;s back.</p></div></div>
-<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fpmode" class="fbtn glass" aria-label="Pointer mode" title="Switch touch / trackpad pointer">${ICOTOUCH}<span>Touch</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"><i></i></div></div>
+<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button><div class="sep"></div><button data-act="kill" class="danger">${ICOPOWER}<span>Close session</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fpmode" class="fbtn glass" aria-label="Pointer mode" title="Switch touch / trackpad pointer">${ICOTOUCH}<span>Touch</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"><i></i></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
@@ -657,7 +670,13 @@ fmenu.onclick=e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagat
   else if(act==='copy')doCopy();
   else if(act==='save')doSave();
   else if(act==='rotate')toggleRot();
-  else if(act==='fs')doFullscreen();};
+  else if(act==='fs')doFullscreen();
+  else if(act==='kill')killFocusSession();};
+// close (kill) the focused browser tab via the guarded server endpoint — destructive, so confirm first
+function killFocusSession(){if(!focusSlug)return;const slug=focusSlug;const name=shortTitle((meta.get(slug)||{}).title)||slug;
+  if(!confirm('Close this browser session?\\n\\n'+name+'\\n\\nThe agent loses this tab — this cannot be undone.'))return;
+  buzz(25);fetch('/api/kill',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({slug})}).catch(()=>{});
+  nav('/');setTimeout(()=>{try{poll();}catch(_){}},450);}
 addEventListener('click',e=>{if(fmenu.classList.contains('on')&&!(e.target.closest&&e.target.closest('#fmenu,#fmore')))closeFMenu();});
 fzap.onclick=e=>{e.stopPropagation();buzz();nav('/active');};
 // tap the title (or pencil cue) to rename the session (persists, feeds the tile name); Enter saves, Esc cancels, blank reverts
@@ -1071,6 +1090,12 @@ const server = http.createServer((req, res) => {
     if (!localOrigin(req)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"ok":false,"err":"origin"}'); return; }
     let body = ''; req.on('data', c => { body += c; if (body.length > 16384) req.destroy(); });
     req.on('end', () => { let j = null; try { j = JSON.parse(body); } catch {} const ok = !!(j && dispatchInput(j)); res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(`{"ok":${ok}}`); });
+    return;
+  }
+  if (req.method === 'POST' && u === '/api/kill') {     // close (kill) a watched session — same-origin guarded, like /api/input
+    if (!localOrigin(req)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"ok":false,"err":"origin"}'); return; }
+    let body = ''; req.on('data', c => { body += c; if (body.length > 4096) req.destroy(); });
+    req.on('end', () => { let j = null; try { j = JSON.parse(body); } catch {} const ok = !!(j && j.slug && killSession(j.slug)); res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(`{"ok":${ok}}`); });
     return;
   }
   if (u === '/api/sessions') {

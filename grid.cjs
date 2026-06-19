@@ -17,8 +17,8 @@ const TILE = { format: 'jpeg', quality: +(process.env.TILE_Q || 55), maxWidth: +
 const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +(process.env.HQ_W   || 1920), maxHeight: +(process.env.HQ_H   || 1200), everyNthFrame: 1 }; // crisp focus frames
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
 const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
-const ACTIVE_MS = +(process.env.ACTIVE_MS || 4000);  // paint OR navigation within this window => "active" (it's doing something)
-const HANG_MS   = +(process.env.STUCK_MS  || 25000); // a navigation still loading this long with no load event => "stuck" (genuinely hung, not just idle)
+// session-state classification lives in src/state.cjs (pure + unit-tested); bundled inline by the build step.
+const { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention } = require('./src/state.cjs');
 
 const sessions = new Map(); // port -> { port, id, title, url, wsUrl, ws, lastFrame, lastSentAt, lastPaintAt, frames, tabs }
 const hq = new Map();       // slug -> { ws, lastFrame, lastSentAt, lastPaintAt, subs:Set, capT } — on-demand high-res focus
@@ -237,15 +237,7 @@ refresh(); setInterval(refresh, 5000);
 // active  = a navigation/load happened OR the page painted within ACTIVE_MS (it's doing something)
 // stuck   = a navigation started and never finished for >HANG_MS (genuinely hung) — a STILL page is idle, never stuck
 // idle    = loaded + quiet (the normal resting state; not an alert)
-function stateOf(s) {
-  if (!s.ws || !s.lastFrame) return 'idle';                                       // not connected / nothing seen yet
-  if (s.loadingSince && Date.now() - s.loadingSince > HANG_MS) return 'stuck';     // top-frame navigation that never completed
-  if (Date.now() - (s.lastActivityAt || 0) < ACTIVE_MS) return 'active';           // recent paint or navigation
-  return 'idle';
-}
-// needs you = a hung page, or a URL/title that looks like it wants a human (login / captcha / 2FA / auth / consent)
-const NEEDS_RE = /login|sign[-_ ]?in|signin|log[-_ ]?in|password|captcha|recaptcha|challenge|verif|two[-_ ]?factor|2fa|one[-_ ]?time[-_ ]?code|\botp\b|accounts\.google|\/oauth|\/auth\b|authorize|consent|are you (a )?human/i;
-function needsAttention(s) { return stateOf(s) === 'stuck' || NEEDS_RE.test(((s.url || '') + ' ' + (s.title || ''))); }
+// stateOf / needsAttention / NEEDS_RE imported from ./src/state.cjs above (pure + unit-tested)
 // close (kill) a watched session: Page.close over its own CDP socket, plus the documented HTTP close as a fallback
 function killSession(slug) {
   const s = sessionBySlug(slug);

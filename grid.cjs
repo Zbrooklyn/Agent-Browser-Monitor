@@ -112,6 +112,34 @@ module.exports = { reduceTileMessage };
 
 return module.exports; })();
 
+const __mod_security = (() => { const module = { exports: {} }; const exports = module.exports;
+// src/security.cjs — pure same-origin / CSRF guard (NO side effects, requireable by tests).
+// Bundled inline into grid.cjs by the build step.
+//
+// THREAT: a malicious web page open *inside a watched browser* scripts fetch() at the dashboard's
+// control endpoints (/api/input, /api/kill). A browser always attaches the page's real Origin to a
+// cross-origin request, so we allow only origins on the trusted local/tailnet surface and reject the
+// rest. A request with NO Origin header is a non-browser client (curl/native) — not the drive-by
+// threat — and is allowed; set TOKEN to gate those too.
+function isLocalOrigin(origin) {
+  if (!origin) return true;                                              // non-browser client (no Origin) — gate with TOKEN if needed
+  let h; try { h = new URL(origin).hostname; } catch { return false; }   // unparseable Origin → reject
+  h = h.replace(/^\[|\]$/g, '');                                         // URL.hostname wraps IPv6 in [] — strip for comparison
+  if (h === '127.0.0.1' || h === 'localhost' || h === '::1') return true;
+  if (/\.ts\.net$/i.test(h)) return true;                                // tailscale serve hostnames
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return true;   // tailscale CGNAT 100.64.0.0/10
+  if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true; // private LAN (RFC 1918)
+  return false;                                                          // any public origin → reject
+}
+
+// security headers applied to every response: block MIME-sniffing and keep the dashboard URL
+// (which may carry ?token=) out of Referer headers when a watched-page navigation occurs.
+const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
+
+module.exports = { isLocalOrigin, SECURITY_HEADERS };
+
+return module.exports; })();
+
 // Agent Browsers — mission control for many AI-driven browsers, watched from a phone.
 // Pure Node (built-in WebSocket client + http + SSE) + a PowerShell call for port discovery.
 // Watch-only. Expose it however you like (a tailnet via `tailscale serve` is the easy private option). See README.md.
@@ -1135,15 +1163,9 @@ self.addEventListener('fetch',e=>{const req=e.request;if(req.method!=='GET')retu
 // open inside a watched browser scripting fetch() at the dashboard; such a request carries a
 // public Origin, so we allow only local/tailnet origins (loopback, *.ts.net, tailscale CGNAT,
 // private LAN). No Origin header (non-browser client) is allowed; set TOKEN to gate those too.
-function localOrigin(req) {
-  const o = req.headers.origin; if (!o) return true;
-  let h; try { h = new URL(o).hostname; } catch { return false; }
-  if (h === '127.0.0.1' || h === 'localhost' || h === '::1') return true;
-  if (/\.ts\.net$/i.test(h)) return true;                                  // tailscale serve hostnames
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(h)) return true;     // tailscale CGNAT 100.64.0.0/10
-  if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h)) return true; // private LAN
-  return false;
-}
+// pure same-origin guard + security headers live in src/security.cjs (unit-tested); bundled inline by the build step
+const { isLocalOrigin, SECURITY_HEADERS } = __mod_security;
+function localOrigin(req) { return isLocalOrigin(req.headers.origin); }
 function reqToken(req) {
   try { const q = new URL(req.url, 'http://x').searchParams.get('token'); if (q) return q; } catch {}
   if (req.headers['x-token']) return req.headers['x-token'];
@@ -1154,6 +1176,7 @@ function authed(req) { return !TOKEN || reqToken(req) === TOKEN; }
 
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
+  for (const k in SECURITY_HEADERS) res.setHeader(k, SECURITY_HEADERS[k]); // nosniff + no-referrer on every response (writeHead merges, never overrides)
   // optional shared-secret gate: ?token=… sets a year-long cookie, then the device is unlocked
   if (TOKEN) {
     let q = ''; try { q = new URL(req.url, 'http://x').searchParams.get('token') || ''; } catch {}

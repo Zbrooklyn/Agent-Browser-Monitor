@@ -201,19 +201,32 @@ node grid.cjs [host] [port]
 
 ## Security
 
-- **Control is real input.** With Control enabled the dashboard sends live clicks,
-  keystrokes, and scrolls to the browser over CDP.
-- **Origin-guarded (always on).** The control endpoint rejects requests whose `Origin` is a
-  public website, so a malicious page open *inside a watched browser* can't script
-  `fetch()` against the dashboard and drive your fleet. Only local/tailnet origins
-  (loopback, `*.ts.net`, tailscale CGNAT, private LAN) are accepted.
-- **Optional shared secret.** Set `TOKEN=…` to lock the whole dashboard *and* control
-  behind a token — open it once per device with `?token=YOUR_TOKEN` (it sets a long-lived
+### Threat model
+
+The server binds to `127.0.0.1` and is meant to be reached only over your own tailnet
+(`tailscale serve`). The realistic adversary is **a malicious web page open inside one of
+the watched browsers** that tries to script `fetch()` against the dashboard to drive your
+fleet, exfiltrate, or close sessions. The mitigations below are built around that.
+
+| Surface | Mitigation |
+|---|---|
+| `/api/input` (clicks/keys/scroll) & `/api/kill` (close a session) | **Origin-guarded, always on.** A browser attaches the page's real `Origin` to any cross-origin request; only local/tailnet origins (loopback, `*.ts.net`, tailscale CGNAT `100.64/10`, RFC-1918 LAN) are accepted, every public origin is rejected `403`. Verified by `test/security.test.cjs`, incl. CGNAT/RFC-1918 boundary and `*.ts.net` suffix-spoof cases. |
+| Watched-page content rendered on the wall (tile title, URL, domain) | **No injection vector.** Every watched-page string is written with `.textContent`, never `innerHTML`; the server emits `/api/sessions` via `JSON.stringify`. HTML-entity decoding uses a detached `<textarea>` (RCDATA — an `<img onerror>` is inert text, no load fires). A hostile `<title>` is shown literally, it cannot run script on the dashboard. |
+| Request flooding | `/api/input` and `/api/kill` bodies are hard-capped (16 KB / 4 KB) and the socket is destroyed past the limit. |
+| MIME sniffing / URL leakage | Every response carries `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer` (keeps a `?token=` URL out of `Referer`). |
+
+### Access control
+
+- **Optional shared secret.** Set `TOKEN=…` to lock the whole dashboard *and* control behind
+  a token — open it once per device with `?token=YOUR_TOKEN` (it sets a long-lived `SameSite=Lax`
   cookie). Recommended if your tailnet has devices/users you don't fully trust. Without it,
-  viewing is open and only control is origin-guarded.
-- Binds to `127.0.0.1`. Nothing is exposed until you choose to. A tailnet via
-  `tailscale serve` is the recommended private option. **Never put it on the public
-  internet.**
+  *viewing* is open and only *control* is origin-guarded. A request with **no** `Origin` header
+  (a non-browser client like curl) passes the origin guard by design — set `TOKEN` to gate those too.
+- Binds to `127.0.0.1`. Nothing is exposed until you choose to. A tailnet via `tailscale serve`
+  is the recommended private option. **Never put it on the public internet.**
+
+### Operational notes
+
 - **Don't drive a fresh sign-in through it.** Browsers launched for CDP are flagged as
   automation, so a freshly typed Google/SSO password is refused ("this browser may not be
   secure") — that is the provider's policy, not a bug. Control works fine on sessions that

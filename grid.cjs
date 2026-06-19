@@ -259,7 +259,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-18-control';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
+const BUILD = '2026-06-18-menufix';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -514,6 +514,7 @@ body.embed #focus{display:block}
   .sheetgrip{display:block;position:sticky;top:0;margin:0 -10px;padding:8px 0 4px;background:#16161a;z-index:1;cursor:grab;touch-action:none}
   .sheetgrip::before{content:"";display:block;width:38px;height:4px;border-radius:3px;background:#4a4a52;margin:0 auto}
   body.sheet-open #scrim{opacity:1;pointer-events:auto}
+  body.sheet-open #top{z-index:60}   /* the sheet lives inside #top (a z:10 stacking context) — lift it above the scrim (z:55) so sheet taps land on items, not the scrim */
   .mrow{padding:9px 12px;font-size:14px}
   .msec{padding:7px 12px 3px}
   #optmenu .msep{margin:3px 0}
@@ -894,7 +895,9 @@ document.addEventListener('click',e=>{if(optmenu.classList.contains('open')&&!op
 // downward movement, so taps on rows still register; armed only when the sheet is
 // scrolled to its top so it never fights native scroll on a short viewport.
 (function(){let sy=0,dy=0,armed=false,drag=false,pid=null;
-  optmenu.addEventListener('pointerdown',e=>{if(optmenu.scrollTop>0)return;sy=e.clientY;dy=0;armed=true;drag=false;pid=e.pointerId;});
+  optmenu.addEventListener('pointerdown',e=>{if(optmenu.scrollTop>0)return;
+    if(e.target.closest('button,a,input,.mrow,.showseg,.miniseg,.swt'))return;   // never arm the dismiss-drag on a control — a tap's micro-roll would capture the pointer and eat the item's click
+    sy=e.clientY;dy=0;armed=true;drag=false;pid=e.pointerId;});
   optmenu.addEventListener('pointermove',e=>{if(!armed||e.pointerId!==pid)return;dy=e.clientY-sy;
     if(dy<=0){if(!drag)armed=false;return;}
     if(!drag&&dy>8){drag=true;optmenu.classList.add('dragging');try{optmenu.setPointerCapture(pid);}catch(_){}}

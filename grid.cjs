@@ -67,6 +67,51 @@ module.exports = { slugify, PSL2, deriveSlug, parsePorts };
 
 return module.exports; })();
 
+const __mod_cdp = (() => { const module = { exports: {} }; const exports = module.exports;
+// src/cdp.cjs — pure reducer for tile-session CDP messages (NO side effects, requireable by tests).
+// Mutates the session-state object `s` and RETURNS a list of side-effect actions for the caller to perform,
+// so the socket handler stays a thin, fully-guarded shell. Bundled inline into grid.cjs by the build step.
+//
+// Returned actions (each at most once per message):
+//   { ack: <sessionId> }   → caller sends Page.screencastFrameAck
+//   { forward: <data> }    → caller pushes the JPEG to the multiplexed feed
+//
+// Every property access is guarded so a malformed/partial frame can never throw out of the hot loop.
+function reduceTileMessage(s, m, now, rateMs) {
+  const acts = [];
+  if (!m || typeof m !== 'object') return acts;
+  const p = m.params || {};
+
+  if (m.method === 'Page.screencastFrame') {
+    acts.push({ ack: p.sessionId });                              // always ack so frames keep flowing
+    if (typeof p.data === 'string') {
+      s.frames = (s.frames || 0) + 1; s.lastFrame = p.data; s.lastPaintAt = now; s.lastActivityAt = now; // a real paint = visible activity
+      if (now - (s.lastSentAt || 0) >= rateMs) { s.lastSentAt = now; acts.push({ forward: p.data }); }   // per-tile rate-cap
+    }
+  } else if (m.method === 'Page.frameStartedLoading') {
+    s.lastActivityAt = now; if (!s.mainFrame || p.frameId === s.mainFrame) { if (!s.loadingSince) s.loadingSince = now; }
+  } else if (m.method === 'Page.frameStoppedLoading') {
+    s.lastActivityAt = now; if (!s.mainFrame || p.frameId === s.mainFrame) s.loadingSince = 0;
+  } else if (m.method === 'Page.loadEventFired' || m.method === 'Page.domContentEventFired') {
+    s.lastActivityAt = now; s.loadingSince = 0;
+  } else if (m.method === 'Page.frameNavigated' && p.frame && !p.frame.parentId) {
+    s.mainFrame = p.frame.id; s.lastActivityAt = now;
+  } else if (m.id !== undefined && m.result && typeof m.result.data === 'string') {
+    // captureScreenshot seed — re-seeds a non-painting tile; deliberately does NOT touch lastPaintAt/lastActivityAt
+    s.lastFrame = m.result.data; s.lastSentAt = now; acts.push({ forward: m.result.data });
+  } else if (m.result && m.result.frameTree && m.result.frameTree.frame) {
+    s.mainFrame = m.result.frameTree.frame.id;                    // learn the top frame (ignore subframe loads)
+  } else if (m.result && m.result.result && typeof m.result.result.value === 'string') {
+    // Runtime.evaluate(document.readyState) — catches a page already hung-loading when we attached
+    if (m.result.result.value !== 'complete') { if (!s.loadingSince) s.loadingSince = now; } else s.loadingSince = 0;
+  }
+  return acts;
+}
+
+module.exports = { reduceTileMessage };
+
+return module.exports; })();
+
 // Agent Browsers — mission control for many AI-driven browsers, watched from a phone.
 // Pure Node (built-in WebSocket client + http + SSE) + a PowerShell call for port discovery.
 // Watch-only. Expose it however you like (a tailnet via `tailscale serve` is the easy private option). See README.md.
@@ -96,6 +141,8 @@ const feedClients = new Set(); // res objects subscribed to the one multiplexed 
 // ---- slugs (stable, human-readable identity) -------------------------------
 // pure helpers (slugify / deriveSlug / parsePorts) live in src/slug.cjs (unit-tested); bundled inline by the build step
 const { slugify, deriveSlug, parsePorts } = __mod_slug;
+// pure CDP tile-message reducer (unit-tested) — keeps the hot loop a thin guarded shell
+const { reduceTileMessage } = __mod_cdp;
 function uniqueSlug(base, selfPort) {
   const used = new Set([...sessions.values()].filter(s => s.port !== selfPort).map(s => s.id).filter(Boolean));
   if (!base) { let n = 1; while (used.has('session-' + n)) n++; return 'session-' + n; }
@@ -180,30 +227,15 @@ function connect(s) {
     // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
     // captureScreenshot seed: a static / just-opened page emits NO screencast frames, so without a seed the tile is blank until something moves
     ws.onopen = () => { send('Page.enable'); send('Page.getFrameTree'); send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true }); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); s.lastActivityAt = Date.now(); };
+    // hot loop: fully guarded. reduceTileMessage (src/cdp.cjs, unit-tested) mutates s + returns side-effect actions;
+    // a malformed/partial CDP frame can never throw out of this handler.
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.method === 'Page.screencastFrame') {
-        send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
-        const now = Date.now();
-        s.frames++; s.lastFrame = m.params.data; s.lastPaintAt = now; s.lastActivityAt = now;   // a real paint = visible activity (the idle re-capture below does NOT bump these)
-        // per-tile rate-cap: forward at most ~12.5 fps. Skipped frames still live in lastFrame, so the FLOOR re-send
-        // (and idle-recapture) carry the latest image within FLOOR_MS — the last frame after motion stops is never lost.
-        if (now - s.lastSentAt >= TILE_MIN_MS) { s.lastSentAt = now; feedSend(s.id, m.params.data); }
+      let acts; try { acts = reduceTileMessage(s, m, Date.now(), TILE_MIN_MS); } catch { return; }
+      for (const a of acts) {
+        if ('ack' in a) send('Page.screencastFrameAck', { sessionId: a.ack });
+        else if ('forward' in a) feedSend(s.id, a.forward);
       }
-      // navigation / load events = the honest "active" + "stuck" signals (Page.enable delivers these for free)
-      else if (m.method === 'Page.frameStartedLoading') { s.lastActivityAt = Date.now(); if (!s.mainFrame || m.params.frameId === s.mainFrame) { if (!s.loadingSince) s.loadingSince = Date.now(); } }
-      else if (m.method === 'Page.frameStoppedLoading') { s.lastActivityAt = Date.now(); if (!s.mainFrame || m.params.frameId === s.mainFrame) s.loadingSince = 0; }
-      else if (m.method === 'Page.loadEventFired' || m.method === 'Page.domContentEventFired') { s.lastActivityAt = Date.now(); s.loadingSince = 0; }
-      else if (m.method === 'Page.frameNavigated' && m.params.frame && !m.params.frame.parentId) { s.mainFrame = m.params.frame.id; s.lastActivityAt = Date.now(); }
-      // captureScreenshot result — re-seeds a non-painting tile so it never goes blank/frozen. Deliberately does NOT
-      // touch lastPaintAt/lastActivityAt, so a still page reads as idle (not active) and the idle sweep keeps recapturing.
-      else if (m.id !== undefined && m.result && typeof m.result.data === 'string') {
-        s.lastFrame = m.result.data; s.lastSentAt = Date.now(); feedSend(s.id, m.result.data);
-      }
-      // Page.getFrameTree reply → learn the top frame so loading-hang detection ignores subframes (ads/iframes)
-      else if (m.result && m.result.frameTree && m.result.frameTree.frame) { s.mainFrame = m.result.frameTree.frame.id; }
-      // Runtime.evaluate(document.readyState) reply → catches a page already hung-loading when we attached (we missed its frameStartedLoading)
-      else if (m.result && m.result.result && typeof m.result.result.value === 'string') { if (m.result.result.value !== 'complete') { if (!s.loadingSince) s.loadingSince = Date.now(); } else s.loadingSince = 0; }
     };
     ws.onclose = () => { s.ws = null; };
     ws.onerror = () => {};
@@ -223,13 +255,16 @@ function hqConnect(slug) {
     ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); h.lmId = send('Page.getLayoutMetrics'); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.method === 'Page.screencastFrame') {
-        send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
-        const md = m.params.metadata; if (md) { if (md.deviceWidth) h.vw = md.deviceWidth; if (md.deviceHeight) h.vh = md.deviceHeight; } // viewport CSS px → click mapping
-        h.lastPaintAt = Date.now(); push(m.params.data);
-      }
-      else if (m.id === h.lmId && m.result && m.result.cssLayoutViewport) { const lv = m.result.cssLayoutViewport; if (!h.vw) h.vw = lv.clientWidth; if (!h.vh) h.vh = lv.clientHeight; } // fallback viewport size for a static page
-      else if (m.id !== undefined && m.result && typeof m.result.data === 'string') { push(m.result.data); } // captureScreenshot seed/refresh
+      try {
+        const p = m.params || {};
+        if (m.method === 'Page.screencastFrame') {
+          send('Page.screencastFrameAck', { sessionId: p.sessionId });
+          const md = p.metadata; if (md) { if (md.deviceWidth) h.vw = md.deviceWidth; if (md.deviceHeight) h.vh = md.deviceHeight; } // viewport CSS px → click mapping
+          h.lastPaintAt = Date.now(); if (typeof p.data === 'string') push(p.data);
+        }
+        else if (m.id === h.lmId && m.result && m.result.cssLayoutViewport) { const lv = m.result.cssLayoutViewport; if (!h.vw) h.vw = lv.clientWidth; if (!h.vh) h.vh = lv.clientHeight; } // fallback viewport size for a static page
+        else if (m.id !== undefined && m.result && typeof m.result.data === 'string') { push(m.result.data); } // captureScreenshot seed/refresh
+      } catch { /* a malformed focus-stream frame must never throw out of the hot loop */ }
     };
     ws.onclose = () => { h.ws = null; };
     ws.onerror = () => {};

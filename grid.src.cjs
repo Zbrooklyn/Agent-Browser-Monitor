@@ -27,6 +27,8 @@ const feedClients = new Set(); // res objects subscribed to the one multiplexed 
 // ---- slugs (stable, human-readable identity) -------------------------------
 // pure helpers (slugify / deriveSlug / parsePorts) live in src/slug.cjs (unit-tested); bundled inline by the build step
 const { slugify, deriveSlug, parsePorts } = require('./src/slug.cjs');
+// pure CDP tile-message reducer (unit-tested) — keeps the hot loop a thin guarded shell
+const { reduceTileMessage } = require('./src/cdp.cjs');
 function uniqueSlug(base, selfPort) {
   const used = new Set([...sessions.values()].filter(s => s.port !== selfPort).map(s => s.id).filter(Boolean));
   if (!base) { let n = 1; while (used.has('session-' + n)) n++; return 'session-' + n; }
@@ -111,30 +113,15 @@ function connect(s) {
     // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
     // captureScreenshot seed: a static / just-opened page emits NO screencast frames, so without a seed the tile is blank until something moves
     ws.onopen = () => { send('Page.enable'); send('Page.getFrameTree'); send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true }); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); s.lastActivityAt = Date.now(); };
+    // hot loop: fully guarded. reduceTileMessage (src/cdp.cjs, unit-tested) mutates s + returns side-effect actions;
+    // a malformed/partial CDP frame can never throw out of this handler.
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.method === 'Page.screencastFrame') {
-        send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
-        const now = Date.now();
-        s.frames++; s.lastFrame = m.params.data; s.lastPaintAt = now; s.lastActivityAt = now;   // a real paint = visible activity (the idle re-capture below does NOT bump these)
-        // per-tile rate-cap: forward at most ~12.5 fps. Skipped frames still live in lastFrame, so the FLOOR re-send
-        // (and idle-recapture) carry the latest image within FLOOR_MS — the last frame after motion stops is never lost.
-        if (now - s.lastSentAt >= TILE_MIN_MS) { s.lastSentAt = now; feedSend(s.id, m.params.data); }
+      let acts; try { acts = reduceTileMessage(s, m, Date.now(), TILE_MIN_MS); } catch { return; }
+      for (const a of acts) {
+        if ('ack' in a) send('Page.screencastFrameAck', { sessionId: a.ack });
+        else if ('forward' in a) feedSend(s.id, a.forward);
       }
-      // navigation / load events = the honest "active" + "stuck" signals (Page.enable delivers these for free)
-      else if (m.method === 'Page.frameStartedLoading') { s.lastActivityAt = Date.now(); if (!s.mainFrame || m.params.frameId === s.mainFrame) { if (!s.loadingSince) s.loadingSince = Date.now(); } }
-      else if (m.method === 'Page.frameStoppedLoading') { s.lastActivityAt = Date.now(); if (!s.mainFrame || m.params.frameId === s.mainFrame) s.loadingSince = 0; }
-      else if (m.method === 'Page.loadEventFired' || m.method === 'Page.domContentEventFired') { s.lastActivityAt = Date.now(); s.loadingSince = 0; }
-      else if (m.method === 'Page.frameNavigated' && m.params.frame && !m.params.frame.parentId) { s.mainFrame = m.params.frame.id; s.lastActivityAt = Date.now(); }
-      // captureScreenshot result — re-seeds a non-painting tile so it never goes blank/frozen. Deliberately does NOT
-      // touch lastPaintAt/lastActivityAt, so a still page reads as idle (not active) and the idle sweep keeps recapturing.
-      else if (m.id !== undefined && m.result && typeof m.result.data === 'string') {
-        s.lastFrame = m.result.data; s.lastSentAt = Date.now(); feedSend(s.id, m.result.data);
-      }
-      // Page.getFrameTree reply → learn the top frame so loading-hang detection ignores subframes (ads/iframes)
-      else if (m.result && m.result.frameTree && m.result.frameTree.frame) { s.mainFrame = m.result.frameTree.frame.id; }
-      // Runtime.evaluate(document.readyState) reply → catches a page already hung-loading when we attached (we missed its frameStartedLoading)
-      else if (m.result && m.result.result && typeof m.result.result.value === 'string') { if (m.result.result.value !== 'complete') { if (!s.loadingSince) s.loadingSince = Date.now(); } else s.loadingSince = 0; }
     };
     ws.onclose = () => { s.ws = null; };
     ws.onerror = () => {};
@@ -154,13 +141,16 @@ function hqConnect(slug) {
     ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); h.lmId = send('Page.getLayoutMetrics'); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
-      if (m.method === 'Page.screencastFrame') {
-        send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
-        const md = m.params.metadata; if (md) { if (md.deviceWidth) h.vw = md.deviceWidth; if (md.deviceHeight) h.vh = md.deviceHeight; } // viewport CSS px → click mapping
-        h.lastPaintAt = Date.now(); push(m.params.data);
-      }
-      else if (m.id === h.lmId && m.result && m.result.cssLayoutViewport) { const lv = m.result.cssLayoutViewport; if (!h.vw) h.vw = lv.clientWidth; if (!h.vh) h.vh = lv.clientHeight; } // fallback viewport size for a static page
-      else if (m.id !== undefined && m.result && typeof m.result.data === 'string') { push(m.result.data); } // captureScreenshot seed/refresh
+      try {
+        const p = m.params || {};
+        if (m.method === 'Page.screencastFrame') {
+          send('Page.screencastFrameAck', { sessionId: p.sessionId });
+          const md = p.metadata; if (md) { if (md.deviceWidth) h.vw = md.deviceWidth; if (md.deviceHeight) h.vh = md.deviceHeight; } // viewport CSS px → click mapping
+          h.lastPaintAt = Date.now(); if (typeof p.data === 'string') push(p.data);
+        }
+        else if (m.id === h.lmId && m.result && m.result.cssLayoutViewport) { const lv = m.result.cssLayoutViewport; if (!h.vw) h.vw = lv.clientWidth; if (!h.vh) h.vh = lv.clientHeight; } // fallback viewport size for a static page
+        else if (m.id !== undefined && m.result && typeof m.result.data === 'string') { push(m.result.data); } // captureScreenshot seed/refresh
+      } catch { /* a malformed focus-stream frame must never throw out of the hot loop */ }
     };
     ws.onclose = () => { h.ws = null; };
     ws.onerror = () => {};

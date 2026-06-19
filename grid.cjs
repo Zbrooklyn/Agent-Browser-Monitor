@@ -112,6 +112,29 @@ module.exports = { reduceTileMessage };
 
 return module.exports; })();
 
+const __mod_version = (() => { const module = { exports: {} }; const exports = module.exports;
+// src/version.cjs — pure semver compare for the update check (NO side effects, requireable by tests).
+// Bundled inline into grid.cjs by the build step.
+
+// "v2.10.0" / "2.2.0-beta" → [2,10,0] (strips a leading v and any -prerelease suffix, non-numeric parts → 0)
+function parseVer(v) {
+  return String(v || '').trim().replace(/^v/i, '').split('-')[0].split('.').map(n => parseInt(n, 10) || 0);
+}
+
+// true iff version `a` is strictly newer than `b` (component-wise, shorter side padded with 0s)
+function isNewer(a, b) {
+  const x = parseVer(a), y = parseVer(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
+module.exports = { parseVer, isNewer };
+
+return module.exports; })();
+
 const __mod_security = (() => { const module = { exports: {} }; const exports = module.exports;
 // src/security.cjs — pure same-origin / CSRF guard (NO side effects, requireable by tests).
 // Bundled inline into grid.cjs by the build step.
@@ -399,6 +422,31 @@ const ICOPOWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 // no hand-edited version string to forget. Falls back to 'dev' if the file can't be read.
 const BUILD = (() => { try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 10); } catch { return 'dev'; } })();
 
+// ---- update check (self-host friendly) -------------------------------------
+// VERSION is the released version of THIS file. Once a day (and at startup) the server asks GitHub for the
+// latest published Release and, if it's newer, the dashboard shows a dismissible "update available" chip so
+// people running their own copy learn that a new version shipped. It only NOTIFIES + links — it never modifies
+// anyone's code. One outbound call to api.github.com; set NO_UPDATE_CHECK=1 to disable it entirely (airgap/privacy).
+const { isNewer } = __mod_version;
+const VERSION = '2.2.0';
+const REPO = 'Zbrooklyn/Agent-Browser-Monitor';
+const REPO_URL = `https://github.com/${REPO}`;
+const UPDATE_CHECK = !process.env.NO_UPDATE_CHECK;
+let updateInfo = { version: VERSION, latest: null, updateAvailable: false, url: REPO_URL + '/releases', checked: false };
+async function checkForUpdate() {
+  if (!UPDATE_CHECK || typeof fetch !== 'function') return;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`,
+      { headers: { 'User-Agent': 'agent-browser-monitor', 'Accept': 'application/vnd.github+json' }, signal: AbortSignal.timeout(6000) });
+    updateInfo.checked = true;
+    if (!r.ok) return;                                   // no release yet (404) / rate-limited → stay quiet
+    const j = await r.json();
+    const latest = (j.tag_name || '').replace(/^v/i, '');
+    if (latest) { updateInfo.latest = latest; updateInfo.updateAvailable = isNewer(latest, VERSION); updateInfo.url = j.html_url || updateInfo.url; }
+  } catch { /* offline / DNS / timeout — never let the update check affect the dashboard */ }
+}
+if (UPDATE_CHECK) { checkForUpdate(); setInterval(checkForUpdate, 24 * 60 * 60 * 1000).unref?.(); }
+
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -502,6 +550,12 @@ body.embed #top{display:none!important}
 #netbanner{position:fixed;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;justify-content:center;gap:8px;padding:calc(7px + env(safe-area-inset-top)) 12px 7px;background:#e0a44e;color:#241400;font-size:12.5px;font-weight:700;letter-spacing:.01em;transform:translateY(-115%);transition:transform .24s ease;pointer-events:none}
 #netbanner.show{transform:none}
 .nspin{width:13px;height:13px;border:2px solid #2414003d;border-top-color:#241400;border-radius:50%;animation:nspin .7s linear infinite}
+#updbar{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:57;display:none;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:9px 10px 9px 14px;background:rgba(20,22,28,.97);backdrop-filter:blur(10px);border:1px solid var(--line2);border-radius:13px;box-shadow:0 12px 36px #000b;font-size:13px;color:#e6e6ea}
+#updbar.show{display:flex}
+#updbar .ud-dot{width:8px;height:8px;border-radius:50%;background:var(--live);flex:none;box-shadow:0 0 8px #3ecf8e88}
+#updbar #updtxt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#updbar a{color:#7db8ff;text-decoration:none;font-weight:650;white-space:nowrap;padding:2px 4px}
+#updbar button{background:none;border:none;color:var(--muted);font-size:19px;line-height:1;cursor:pointer;padding:0 4px;flex:none}
 @keyframes nspin{to{transform:rotate(360deg)}}
 /* custom pull-to-refresh (PWA standalone suppresses the native gesture) */
 #ptr{position:fixed;top:calc(env(safe-area-inset-top) - 6px);left:50%;transform:translate(-50%,0);z-index:40;width:38px;height:38px;border-radius:50%;background:#1c1c20;border:1px solid var(--line2);box-shadow:0 4px 16px #000a;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:transform .18s ease,opacity .15s}
@@ -680,6 +734,7 @@ body.embed #focus{display:block}
 <button id="watchfab">Watch&nbsp;<b id="watchn">0</b></button>
 <div id="donebar"><button id="donebtn">Done reordering</button></div>
 <div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
+<div id="updbar"><span class="ud-dot"></span><span id="updtxt"></span><a id="updlink" href="${REPO_URL}/releases" target="_blank" rel="noopener">View</a><button id="upddismiss" aria-label="Dismiss update notice">&times;</button></div>
 <div id="empty">${MARK}<div class="emsg"><h2>No agent browsers detected</h2><p>Start any Chromium with remote debugging and it shows up here automatically:</p><code class="ecmd">chrome --remote-debugging-port=9222</code><p class="esub">Works with Chrome, Edge or Brave &mdash; and with Playwright / pool browsers, which expose this by default.</p></div><div class="emsg-off"><h2>Can&rsquo;t reach the dashboard</h2><p>The server looks offline. This reconnects automatically the moment it&rsquo;s back.</p></div></div>
 <div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button><div class="sep"></div><button data-act="kill" class="danger">${ICOPOWER}<span>Close session</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fpmode" class="fbtn glass" aria-label="Pointer mode" title="Switch touch / trackpad pointer">${ICOTOUCH}<span>Touch</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"><i></i></div></div>
 <script>
@@ -712,6 +767,21 @@ function domainOf(u){try{const x=new URL(u);return x.hostname.replace(/^www\\./,
 // ---------- multiplexed tile feed (ONE connection) ----------
 // connection state: a debounced "Reconnecting…" strip when the live feed/server drops (EventSource auto-retries)
 const netbanner=document.getElementById('netbanner');
+// ---- update-available chip: ask the server (which polls GitHub) once on load ----
+const updbar=document.getElementById('updbar'),updtxt=document.getElementById('updtxt'),updlink=document.getElementById('updlink'),upddismiss=document.getElementById('upddismiss');
+let _updLatest='',_pendingUpd=null;
+function showUpdate(info){
+  if(!info||!info.updateAvailable||!info.latest)return;
+  _updLatest=info.latest;
+  try{if(localStorage.getItem('upd_dismissed')===info.latest)return;}catch(_){}   // don't renag a version the user already dismissed
+  const hint=document.getElementById('hint');
+  if(hint&&hint.classList.contains('show')){_pendingUpd=info;return;}              // wait out the one-time first-run hint (same bottom slot) — flushed on its dismissal
+  updtxt.textContent='Update available — v'+info.latest+' · you’re on '+info.version;
+  if(info.url)updlink.href=info.url;
+  updbar.classList.add('show');
+}
+if(upddismiss)upddismiss.onclick=()=>{updbar.classList.remove('show');try{localStorage.setItem('upd_dismissed',_updLatest);}catch(_){}};
+fetch('/api/version').then(r=>r.json()).then(showUpdate).catch(()=>{});
 let netTimer=null,netDown=false;
 function netStatus(ok){
   if(ok){netDown=false;if(netTimer){clearTimeout(netTimer);netTimer=null;}netbanner.classList.remove('show');document.body.classList.remove('offline');}
@@ -1102,7 +1172,7 @@ addEventListener('pointerdown',function once(){if(notifOn&&'Notification' in win
 
 // one-time first-run tip (re-appears after "Clear saved data" since it clears 'seenhint')
 const hint=document.getElementById('hint'),hintok=document.getElementById('hintok');
-hintok.onclick=()=>{hint.classList.remove('show');try{localStorage.setItem('seenhint','1');}catch(_){}};
+hintok.onclick=()=>{hint.classList.remove('show');try{localStorage.setItem('seenhint','1');}catch(_){}if(_pendingUpd){const p=_pendingUpd;_pendingUpd=null;showUpdate(p);}};
 (function(){let seen=true;try{seen=!!localStorage.getItem('seenhint');}catch(_){}if(seen||embed)return;
   setTimeout(()=>{if(!focus.classList.contains('on')&&!document.body.classList.contains('select')&&!document.body.classList.contains('reorder'))hint.classList.add('show');},1000);})();
 
@@ -1223,6 +1293,9 @@ const server = http.createServer((req, res) => {
     const h = hqConnect(slug);
     if (h) { if (h.lastFrame) res.write(`data: ${h.lastFrame}\n\n`); h.subs.add(res); req.on('close', () => { h.subs.delete(res); hqMaybeClose(slug); }); }
     else res.end();
+  } else if (u === '/api/version') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(updateInfo));
   } else if (u === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ sessions: sessions.size, feedClients: feedClients.size, hq: hq.size, slugs: [...sessions.values()].map(s => s.id) }));

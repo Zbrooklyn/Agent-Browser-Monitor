@@ -187,7 +187,23 @@ node grid.cjs [host] [port]
 | `PORTS` | _(auto-detect)_ | skip auto-discovery and watch exactly these debug ports, e.g. `PORTS=9222,9223` |
 | `TILE_Q` / `TILE_W` / `TILE_H` | `55` / `800` / `500` | grid tile JPEG quality + max size |
 | `HQ_Q` / `HQ_W` / `HQ_H` | `82` / `1920` / `1200` | focused-view JPEG quality + max size |
-| `STUCK_MS` | `90000` | no visual change while live before a session is flagged "stuck" |
+| `TILE_MIN_MS` | `80` | per-tile push rate-cap (see [PERF.md](PERF.md) for phone-link presets) |
+| `STUCK_MS` | `25000` | a top-frame navigation still loading this long with no load event → "stuck" |
+| `NO_UPDATE_CHECK` | _(unset)_ | set to disable the once-a-day GitHub update check (see Updates) |
+
+## Updates
+
+Each instance is self-hosted, so to let people running their own copy know when a new version
+ships, the server asks GitHub once at startup (and daily) for the latest **published Release** and,
+if it's newer than the running `VERSION`, shows a small dismissible "update available" chip in the
+dashboard linking to the release. It only **notifies** — it never modifies anyone's code; you update
+with `git pull` (or re-download `grid.cjs`) and restart.
+
+- **To notify everyone of an update:** bump `VERSION` in `grid.src.cjs` (+ `package.json`), then
+  publish a [GitHub Release](https://github.com/Zbrooklyn/Agent-Browser-Monitor/releases) whose tag
+  is the new version (e.g. `v2.3.0`). Every running instance picks it up within a day.
+- **Privacy / airgapped:** the check is a single outbound request to `api.github.com`. Set
+  `NO_UPDATE_CHECK=1` to turn it off entirely — the dashboard then never contacts the network.
 
 ## How it works
 

@@ -17,7 +17,8 @@ const TILE = { format: 'jpeg', quality: +(process.env.TILE_Q || 55), maxWidth: +
 const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +(process.env.HQ_W   || 1920), maxHeight: +(process.env.HQ_H   || 1200), everyNthFrame: 1 }; // crisp focus frames
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
 const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
-const STUCK_MS = +(process.env.STUCK_MS || 90000); // no visual change while live => "stuck"
+const ACTIVE_MS = +(process.env.ACTIVE_MS || 4000);  // paint OR navigation within this window => "active" (it's doing something)
+const HANG_MS   = +(process.env.STUCK_MS  || 25000); // a navigation still loading this long with no load event => "stuck" (genuinely hung, not just idle)
 
 const sessions = new Map(); // port -> { port, id, title, url, wsUrl, ws, lastFrame, lastSentAt, lastPaintAt, frames, tabs }
 const hq = new Map();       // slug -> { ws, lastFrame, lastSentAt, lastPaintAt, subs:Set, capT } — on-demand high-res focus
@@ -94,7 +95,7 @@ async function refresh() {
       if (!tgt.best) continue;
       let s = sessions.get(port);
       if (!s) {
-        s = { port, id: null, title: tgt.best.title, url: tgt.best.url, tabs: tgt.tabs, wsUrl: tgt.best.webSocketDebuggerUrl, ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, frames: 0, miss: 0 };
+        s = { port, id: null, title: tgt.best.title, url: tgt.best.url, tabs: tgt.tabs, wsUrl: tgt.best.webSocketDebuggerUrl, ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, lastActivityAt: Date.now(), loadingSince: 0, mainFrame: null, frames: 0, miss: 0 };
         s.id = uniqueSlug(deriveSlug(s.url, s.title), port);
         sessions.set(port, s); connect(s);
       } else {
@@ -124,22 +125,31 @@ function connect(s) {
     // focus-emulation + active lifecycle keep rAF/animations running even though these windows are backgrounded/occluded
     // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
     // captureScreenshot seed: a static / just-opened page emits NO screencast frames, so without a seed the tile is blank until something moves
-    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); };
+    ws.onopen = () => { send('Page.enable'); send('Page.getFrameTree'); send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true }); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); s.lastActivityAt = Date.now(); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       if (m.method === 'Page.screencastFrame') {
         send('Page.screencastFrameAck', { sessionId: m.params.sessionId });
         const now = Date.now();
-        s.frames++; s.lastFrame = m.params.data; s.lastPaintAt = now;   // always keep the freshest frame + paint clock
+        s.frames++; s.lastFrame = m.params.data; s.lastPaintAt = now; s.lastActivityAt = now;   // a real paint = visible activity (the idle re-capture below does NOT bump these)
         // per-tile rate-cap: forward at most ~12.5 fps. Skipped frames still live in lastFrame, so the FLOOR re-send
         // (and idle-recapture) carry the latest image within FLOOR_MS — the last frame after motion stops is never lost.
         if (now - s.lastSentAt >= TILE_MIN_MS) { s.lastSentAt = now; feedSend(s.id, m.params.data); }
       }
+      // navigation / load events = the honest "active" + "stuck" signals (Page.enable delivers these for free)
+      else if (m.method === 'Page.frameStartedLoading') { s.lastActivityAt = Date.now(); if (!s.mainFrame || m.params.frameId === s.mainFrame) { if (!s.loadingSince) s.loadingSince = Date.now(); } }
+      else if (m.method === 'Page.frameStoppedLoading') { s.lastActivityAt = Date.now(); if (!s.mainFrame || m.params.frameId === s.mainFrame) s.loadingSince = 0; }
+      else if (m.method === 'Page.loadEventFired' || m.method === 'Page.domContentEventFired') { s.lastActivityAt = Date.now(); s.loadingSince = 0; }
+      else if (m.method === 'Page.frameNavigated' && m.params.frame && !m.params.frame.parentId) { s.mainFrame = m.params.frame.id; s.lastActivityAt = Date.now(); }
       // captureScreenshot result — re-seeds a non-painting tile so it never goes blank/frozen. Deliberately does NOT
-      // touch lastPaintAt, so the idle sweep keeps re-capturing a still page (~0.8fps) and recovers a stalled screencast.
+      // touch lastPaintAt/lastActivityAt, so a still page reads as idle (not active) and the idle sweep keeps recapturing.
       else if (m.id !== undefined && m.result && typeof m.result.data === 'string') {
         s.lastFrame = m.result.data; s.lastSentAt = Date.now(); feedSend(s.id, m.result.data);
       }
+      // Page.getFrameTree reply → learn the top frame so loading-hang detection ignores subframes (ads/iframes)
+      else if (m.result && m.result.frameTree && m.result.frameTree.frame) { s.mainFrame = m.result.frameTree.frame.id; }
+      // Runtime.evaluate(document.readyState) reply → catches a page already hung-loading when we attached (we missed its frameStartedLoading)
+      else if (m.result && m.result.result && typeof m.result.result.value === 'string') { if (m.result.result.value !== 'complete') { if (!s.loadingSince) s.loadingSince = Date.now(); } else s.loadingSince = 0; }
     };
     ws.onclose = () => { s.ws = null; };
     ws.onerror = () => {};
@@ -223,15 +233,19 @@ setInterval(() => {
 }, 1300);
 refresh(); setInterval(refresh, 5000);
 
-// ---- session state (for alerting; rendered in Pass 2) ----------------------
+// ---- session state — classify on real activity, NOT pixel-motion ----------
+// active  = a navigation/load happened OR the page painted within ACTIVE_MS (it's doing something)
+// stuck   = a navigation started and never finished for >HANG_MS (genuinely hung) — a STILL page is idle, never stuck
+// idle    = loaded + quiet (the normal resting state; not an alert)
 function stateOf(s) {
-  if (!s.ws || !s.lastFrame) return 'idle';
-  const dt = Date.now() - s.lastPaintAt;
-  if (dt < 2500) return 'active';
-  if (dt >= STUCK_MS) return 'stuck';
+  if (!s.ws || !s.lastFrame) return 'idle';                                       // not connected / nothing seen yet
+  if (s.loadingSince && Date.now() - s.loadingSince > HANG_MS) return 'stuck';     // top-frame navigation that never completed
+  if (Date.now() - (s.lastActivityAt || 0) < ACTIVE_MS) return 'active';           // recent paint or navigation
   return 'idle';
 }
-function needsAttention(s) { return stateOf(s) === 'stuck' || /login|signin|sign-in|captcha|challenge|verify|accounts\.google|\/auth/i.test(s.url || ''); }
+// needs you = a hung page, or a URL/title that looks like it wants a human (login / captcha / 2FA / auth / consent)
+const NEEDS_RE = /login|sign[-_ ]?in|signin|log[-_ ]?in|password|captcha|recaptcha|challenge|verif|two[-_ ]?factor|2fa|one[-_ ]?time[-_ ]?code|\botp\b|accounts\.google|\/oauth|\/auth\b|authorize|consent|are you (a )?human/i;
+function needsAttention(s) { return stateOf(s) === 'stuck' || NEEDS_RE.test(((s.url || '') + ' ' + (s.title || ''))); }
 
 const MARK = '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="2.2" fill="#3ecf8e"/><rect x="13" y="2" width="9" height="9" rx="2.2" fill="#3a3a40"/><rect x="2" y="13" width="9" height="9" rx="2.2" fill="#3a3a40"/><rect x="13" y="13" width="9" height="9" rx="2.2" fill="#3a3a40"/></svg>';
 const ICO1 = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2.2"/></svg>';
@@ -259,7 +273,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-18-menufix';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
+const BUILD = '2026-06-18-states';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

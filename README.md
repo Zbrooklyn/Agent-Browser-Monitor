@@ -199,6 +199,24 @@ node grid.cjs [host] [port]
 - Pure Node: a built-in `WebSocket` client speaks CDP, an `http` server serves the app
   and the streams. No build step, no `node_modules`.
 
+## Building from source
+
+**Running it needs no build** — `grid.cjs` is committed as a single, self-contained,
+zero-dependency file; download it and `node grid.cjs`. The build step is only for *editing*.
+
+The shipped `grid.cjs` is **generated** — don't hand-edit it (your changes are overwritten on
+the next build). Edit the modular source instead and rebuild:
+
+```bash
+# source: grid.src.cjs (the app) + src/*.cjs (state, slug, cdp, security — pure, unit-tested)
+node build.cjs      # or: npm run build   → inlines src/*.cjs into a single grid.cjs
+npm test            # node --test, zero deps (state machine, slug, CDP reducer, origin guard)
+npm run bench       # hot-path perf bench (see PERF.md)
+```
+
+The bundler (`build.cjs`) inlines every `require('./src/*.cjs')` so the deployed artifact stays
+one zero-dependency file — modular to develop, single-file to ship.
+
 ## Security
 
 ### Threat model

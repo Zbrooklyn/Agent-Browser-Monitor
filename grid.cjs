@@ -273,7 +273,7 @@ const ICORELOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
-const BUILD = '2026-06-18-states';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
+const BUILD = '2026-06-19-pointer';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -453,7 +453,12 @@ body.offline #empty .emsg-off{display:block}
 #fcursor{position:absolute;left:-99px;top:-99px;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--live);border-radius:50%;box-shadow:0 0 12px #3ecf8eaa;pointer-events:none;z-index:53;opacity:0;transform:scale(.6);transition:opacity .2s,transform .2s}
 #fcursor.show{opacity:1;transform:scale(1)}
 #fcursor i{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--live);box-shadow:0 0 6px #3ecf8e}  /* precise center point for trackpad mode */
-#fcursor.clicking{transform:scale(1.4);background:#3ecf8e3a}                                  /* quick pulse on a trackpad click */
+#fcursor.clicking{transform:scale(1.4);background:#3ecf8e3a}                                  /* quick pulse on a touch-tap ripple */
+/* trackpad mode: a real mouse-pointer arrow, hotspot (tip) at the click point — not the ring */
+#focus.tpad #fcursor{width:26px;height:26px;margin:-2px 0 0 -4px;border:none;border-radius:0;box-shadow:none;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24'><path d='M4 2L4 19L8.5 14.8L11.7 21.4L14.3 20L11 13.7L17 13.7Z' fill='%23fff' stroke='%23161616' stroke-width='1.5' stroke-linejoin='round'/></svg>") no-repeat 0 0;filter:drop-shadow(0 1px 2px #000a);transform-origin:4px 2px}
+#focus.tpad #fcursor i{display:none}                                                          /* the arrow tip IS the precise point; drop the ring's center dot */
+#focus.tpad #fcursor.show{transform:none}                                                     /* arrow shows at natural size (no ring scale-in) */
+#focus.tpad #fcursor.clicking{transform:scale(.78);background:none}                           /* quick "press" from the tip on click */
 #fpmode{display:none;width:46px;padding:11px 0;justify-content:center}                        /* icon-only square: a 3rd text pill overflows the bar at phone width */
 #fpmode span{display:none}                                                                     /* the icon (finger=touch · arrow=trackpad) carries the mode; green tint = trackpad active */
 #focus.ctl #fpmode{display:inline-flex}                                                       /* pointer-mode toggle only while controlling */

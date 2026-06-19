@@ -7,6 +7,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execFile } = require('child_process');
 
 // ---- config (flags first, then env, then defaults) -------------------------
@@ -251,7 +252,10 @@ const ICOBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const ICOTRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>';
 const ICOCHK = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg>';
 const ICOPOWER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>'; // power — close/kill a session
-const BUILD = '2026-06-19-kill';                                  // single source of truth for the build id (shown in UI + used as the SW version) — bump to invalidate the SW cache on each release
+// Build id = a content hash of the running file, computed once at startup. It is the SW cache version,
+// so ANY change to the served app (this file) auto-busts the service-worker cache on the next load —
+// no hand-edited version string to forget. Falls back to 'dev' if the file can't be read.
+const BUILD = (() => { try { return crypto.createHash('sha1').update(fs.readFileSync(__filename)).digest('hex').slice(0, 10); } catch { return 'dev'; } })();
 
 const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">

@@ -1,0 +1,15 @@
+{
+  "name": "agent-browser-monitor",
+  "version": "2.1.0",
+  "description": "Zero-dependency CDP-screencast grid dashboard for watching many AI-driven browsers from a phone.",
+  "license": "MIT",
+  "private": true,
+  "main": "grid.cjs",
+  "scripts": {
+    "build": "node build.cjs",
+    "test": "node --test",
+    "start": "node grid.cjs",
+    "prepare": "node build.cjs"
+  },
+  "engines": { "node": ">=18" }
+}

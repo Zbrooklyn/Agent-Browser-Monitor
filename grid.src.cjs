@@ -1,38 +1,3 @@
-// grid.cjs — BUILT ARTIFACT. Do not edit by hand.
-// Source: grid.src.cjs + src/*.cjs. Regenerate with: node build.cjs
-// Single self-contained file, zero external dependencies.
-
-const __mod_state = (() => { const module = { exports: {} }; const exports = module.exports;
-// src/state.cjs — pure session-state classification (NO side effects, requireable by tests).
-// Bundled back into the single-file grid.cjs by the build step; at runtime it carries zero external deps.
-//
-// active  = a navigation/load happened OR the page painted within ACTIVE_MS (it's doing something)
-// stuck   = a top-frame navigation started and never finished for >HANG_MS (genuinely hung) — a STILL page is idle, never stuck
-// idle    = loaded + quiet (the normal resting state; not an alert)
-
-const ACTIVE_MS = +(process.env.ACTIVE_MS || 4000);  // paint OR navigation within this window => "active"
-const HANG_MS   = +(process.env.STUCK_MS  || 25000); // a navigation still loading this long with no load event => "stuck"
-
-// classify a session. `now` is injectable so tests are deterministic (defaults to wall clock at call time).
-function stateOf(s, now) {
-  if (now === undefined) now = Date.now();
-  if (!s || !s.ws || !s.lastFrame) return 'idle';                       // not connected / nothing seen yet
-  if (s.loadingSince && now - s.loadingSince > HANG_MS) return 'stuck'; // top-frame navigation that never completed
-  if (now - (s.lastActivityAt || 0) < ACTIVE_MS) return 'active';      // recent paint or navigation
-  return 'idle';
-}
-
-// needs you = a hung page, or a URL/title that looks like it wants a human (login / captcha / 2FA / auth / consent)
-const NEEDS_RE = /login|sign[-_ ]?in|signin|log[-_ ]?in|password|captcha|recaptcha|challenge|verif|two[-_ ]?factor|2fa|one[-_ ]?time[-_ ]?code|\botp\b|accounts\.google|\/oauth|\/auth\b|authorize|consent|are you (a )?human/i;
-
-function needsAttention(s, now) {
-  return stateOf(s, now) === 'stuck' || NEEDS_RE.test((((s && s.url) || '') + ' ' + ((s && s.title) || '')));
-}
-
-module.exports = { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention };
-
-return module.exports; })();
-
 // Agent Browsers — mission control for many AI-driven browsers, watched from a phone.
 // Pure Node (built-in WebSocket client + http + SSE) + a PowerShell call for port discovery.
 // Watch-only. Expose it however you like (a tailnet via `tailscale serve` is the easy private option). See README.md.
@@ -53,7 +18,7 @@ const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
 const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
 // session-state classification lives in src/state.cjs (pure + unit-tested); bundled inline by the build step.
-const { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention } = __mod_state;
+const { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention } = require('./src/state.cjs');
 
 const sessions = new Map(); // port -> { port, id, title, url, wsUrl, ws, lastFrame, lastSentAt, lastPaintAt, frames, tabs }
 const hq = new Map();       // slug -> { ws, lastFrame, lastSentAt, lastPaintAt, subs:Set, capT } — on-demand high-res focus

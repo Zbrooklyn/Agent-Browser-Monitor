@@ -18,6 +18,11 @@ const TILE = { format: 'jpeg', quality: +(process.env.TILE_Q || 55), maxWidth: +
 const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +(process.env.HQ_W   || 1920), maxHeight: +(process.env.HQ_H   || 1200), everyNthFrame: 1 }; // crisp focus frames
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
 const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
+// Render each watched browser at a real desktop viewport before capturing, so the stream shows the WHOLE page instead of a
+// clipped narrow window. CDP screencast mirrors the source viewport, so this is the only way to un-clip a too-small source.
+// On by default (NO_VIEWPORT_FIX=1 to keep the source's own size); VIEW_W/VIEW_H to tune. Cleared when we stop watching a session.
+const VIEWPORT_FIX = !process.env.NO_VIEWPORT_FIX;
+const VIEW_W = +(process.env.VIEW_W || 1280), VIEW_H = +(process.env.VIEW_H || 800);
 // session-state classification lives in src/state.cjs (pure + unit-tested); bundled inline by the build step.
 const { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention } = require('./src/state.cjs');
 
@@ -98,7 +103,7 @@ async function refresh() {
     // so a single partial sweep can't blank the wall
     for (const [port, s] of sessions) {
       if (ports.includes(port)) { s.miss = 0; }
-      else if ((s.miss = (s.miss || 0) + 1) >= 2) { try { s.ws && s.ws.close(); } catch {} sessions.delete(port); }
+      else if ((s.miss = (s.miss || 0) + 1) >= 2) { try { if (VIEWPORT_FIX && s.send) s.send('Emulation.clearDeviceMetricsOverride'); } catch {} try { s.ws && s.ws.close(); } catch {} sessions.delete(port); }
     }
   } finally { refreshing = false; }
 }
@@ -113,7 +118,7 @@ function connect(s) {
     // focus-emulation + active lifecycle keep rAF/animations running even though these windows are backgrounded/occluded
     // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
     // captureScreenshot seed: a static / just-opened page emits NO screencast frames, so without a seed the tile is blank until something moves
-    ws.onopen = () => { send('Page.enable'); send('Page.getFrameTree'); send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true }); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); s.lastActivityAt = Date.now(); };
+    ws.onopen = () => { send('Page.enable'); send('Page.getFrameTree'); send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true }); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); if (VIEWPORT_FIX) send('Emulation.setDeviceMetricsOverride', { width: VIEW_W, height: VIEW_H, deviceScaleFactor: 1, mobile: false }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); s.lastActivityAt = Date.now(); };
     // hot loop: fully guarded. reduceTileMessage (src/cdp.cjs, unit-tested) mutates s + returns side-effect actions;
     // a malformed/partial CDP frame can never throw out of this handler.
     ws.onmessage = (ev) => {

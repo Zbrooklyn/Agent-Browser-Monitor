@@ -188,6 +188,8 @@ node grid.cjs [host] [port]
 | `TILE_Q` / `TILE_W` / `TILE_H` | `55` / `800` / `500` | grid tile JPEG quality + max size |
 | `HQ_Q` / `HQ_W` / `HQ_H` | `82` / `1920` / `1200` | focused-view JPEG quality + max size |
 | `TILE_MIN_MS` | `80` | per-tile push rate-cap (see [PERF.md](PERF.md) for phone-link presets) |
+| `VIEW_W` / `VIEW_H` | `1280` / `800` | desktop viewport each watched browser is rendered at, so the stream shows the whole page even if the source window is small/narrow |
+| `NO_VIEWPORT_FIX` | _(unset)_ | set to keep each browser's own window size instead of normalizing to a desktop viewport |
 | `STUCK_MS` | `25000` | a top-frame navigation still loading this long with no load event → "stuck" |
 | `NO_UPDATE_CHECK` | _(unset)_ | set to disable the once-a-day GitHub update check (see Updates) |
 

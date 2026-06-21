@@ -146,7 +146,8 @@ function hqConnect(slug) {
     const ws = new WebSocket(s.wsUrl); h.ws = ws; let id = 0;
     const send = (m, p = {}) => { const i = ++id; try { ws.send(JSON.stringify({ id: i, method: m, params: p })); } catch {} return i; };
     h.send = send;                                   // exposed so /api/input can dispatch on this focus socket
-    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); h.lmId = send('Page.getLayoutMetrics'); };
+    // setDeviceMetricsOverride is per-CDP-client in modern Chrome, so the focus socket must set its OWN desktop-viewport override — without it, a source browser with a narrow/portrait window streams a clipped, portrait frame to the focus view (the tile session's override does not carry over). Mirrors the tile onopen so focus and grid render the same whole-page viewport.
+    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); if (VIEWPORT_FIX) send('Emulation.setDeviceMetricsOverride', { width: VIEW_W, height: VIEW_H, deviceScaleFactor: 1, mobile: false }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); h.lmId = send('Page.getLayoutMetrics'); };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       try {

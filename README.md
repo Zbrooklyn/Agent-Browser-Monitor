@@ -186,8 +186,9 @@ node grid.cjs [host] [port]
 | `TOKEN` | _(none)_ | optional shared secret — when set, the dashboard + control require `?token=…` once per device (see Security) |
 | `PORTS` | _(auto-detect)_ | skip auto-discovery and watch exactly these debug ports, e.g. `PORTS=9222,9223` |
 | `TILE_Q` / `TILE_W` / `TILE_H` | `55` / `800` / `500` | grid tile JPEG quality + max size |
-| `HQ_Q` / `HQ_W` / `HQ_H` | `82` / `1920` / `1200` | focused-view JPEG quality + max size |
+| `HQ_Q` / `HQ_W` / `HQ_H` | `78` / `1280` / `800` | focused-view JPEG quality + max size. Defaults are phone-sized: at high motion a `1920`q`82` focus stream runs ~2.6 MB/s (~21 Mbps) and buffers on a phone link; `1280`q`78` is ~46% leaner at the same fps and stays crisp. Bump these on a LAN desktop that wants pixel-perfect detail. |
 | `TILE_MIN_MS` | `80` | per-tile push rate-cap (see [PERF.md](PERF.md) for phone-link presets) |
+| `FOCUS_MIN_MS` | `50` | focused-view push rate-cap (~16–20 fps). The focus socket emits up to ~32 fps on a busy page; capping it roughly halves bytes with no perceptible loss for monitoring. Lower toward `25` for buttery motion at higher bandwidth, raise to throttle a constrained link. |
 | `VIEW_W` / `VIEW_H` | `1280` / `800` | desktop viewport each watched browser is rendered at, so the stream shows the whole page even if the source window is small/narrow |
 | `NO_VIEWPORT_FIX` | _(unset)_ | set to keep each browser's own window size instead of normalizing to a desktop viewport |
 | `STUCK_MS` | `25000` | a top-frame navigation still loading this long with no load event → "stuck" |

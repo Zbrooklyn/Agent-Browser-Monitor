@@ -15,9 +15,11 @@ const BIND_HOST = process.argv[2] || process.env.HOST || '127.0.0.1';
 const BIND_PORT = parseInt(process.argv[3] || process.env.PORT || '8090', 10);
 const TOKEN = process.env.TOKEN || '';            // optional shared secret: when set, the dashboard + control require it
 const TILE = { format: 'jpeg', quality: +(process.env.TILE_Q || 55), maxWidth: +(process.env.TILE_W || 800),  maxHeight: +(process.env.TILE_H || 500),  everyNthFrame: 1 }; // cheap tile frames
-const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 82), maxWidth: +(process.env.HQ_W   || 1920), maxHeight: +(process.env.HQ_H   || 1200), everyNthFrame: 1 }; // crisp focus frames
+// Focus stream defaults to a phone-appropriate 1280x800 (not 1920) — a phone screen can't show 1920px of detail, and at high motion a 1920q82 focus stream runs ~2.6 MB/s (~21 Mbps), which a phone link can't sustain → buffering/choppiness. 1280q78 measures ~46% fewer bytes at identical 32fps smoothness. Bump HQ_W/HQ_Q on a LAN desktop that wants crisp.
+const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 78), maxWidth: +(process.env.HQ_W   || 1280), maxHeight: +(process.env.HQ_H   || 800), everyNthFrame: 1 }; // crisp-but-lean focus frames
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
 const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
+const FOCUS_MIN_MS = +(process.env.FOCUS_MIN_MS || 50); // focus push rate-cap (~20 fps). The focus socket emits up to ~32fps on a busy page; >20fps is imperceptible for monitoring but ~37% more bytes. Static agent pages emit few frames so the cap rarely bites; it only clamps the worst case. Freshest frame is always kept for the floor re-send + late joiners.
 // Render each watched browser at a real desktop viewport before capturing, so the stream shows the WHOLE page instead of a
 // clipped narrow window. CDP screencast mirrors the source viewport, so this is the only way to un-clip a too-small source.
 // On by default (NO_VIEWPORT_FIX=1 to keep the source's own size); VIEW_W/VIEW_H to tune. Cleared when we stop watching a session.
@@ -139,7 +141,7 @@ function hqConnect(slug) {
   let h = hq.get(slug); if (h) return h;
   const s = sessionBySlug(slug); if (!s || !s.wsUrl) return null;
   h = { ws: null, lastFrame: null, lastSentAt: 0, lastPaintAt: 0, subs: new Set(), capT: null, send: null, vw: 0, vh: 0, lmId: 0 }; hq.set(slug, h);
-  const push = (data) => { h.lastFrame = data; h.lastSentAt = Date.now(); const pl = `data: ${data}\n\n`; for (const c of h.subs) { try { c.write(pl); } catch {} } };
+  const push = (data) => { h.lastFrame = data; const now = Date.now(); if (now - h.lastSentAt < FOCUS_MIN_MS) return; h.lastSentAt = now; const pl = `data: ${data}\n\n`; for (const c of h.subs) { try { c.write(pl); } catch {} } }; // always keep freshest frame; forward at most one per FOCUS_MIN_MS window
   try {
     const ws = new WebSocket(s.wsUrl); h.ws = ws; let id = 0;
     const send = (m, p = {}) => { const i = ++id; try { ws.send(JSON.stringify({ id: i, method: m, params: p })); } catch {} return i; };

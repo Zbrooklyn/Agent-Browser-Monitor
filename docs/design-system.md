@@ -30,8 +30,8 @@ Body text ≥ 4.5:1, large/secondary ≥ 3:1, measured against the actual render
 ---
 ## Progress
 - [x] Radius scale converged + verified — rendered radii now only 8/12/16/50%/999px (was 10 distinct)
-- [ ] Spacing grid converged + verified
-- [ ] Type scale converged + verified
+- [x] Type scale converged + verified — half-pixels (11.5/12.5/12.8/14.5) + outliers (10/19/21) snapped onto 11/12/13/14/15/17/22; no overflow, on-scale by computed style. (Kept whole-number sizes pragmatically; a rigid ratio would churn a liked UI for no gain. Icon-only buttons compute the UA 13.33px — text-less, cosmetically nil.)
+- [ ] Spacing grid converged + verified  ← did type first to de-risk; spacing is the highest-layout-risk pass
 - [ ] Color tokens converged + verified
 - [ ] Contrast AA audited + fixed
 - [ ] Final before/after visual pass, committed, released

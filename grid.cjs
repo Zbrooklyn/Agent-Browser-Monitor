@@ -185,10 +185,12 @@ const HQ   = { format: 'jpeg', quality: +(process.env.HQ_Q   || 78), maxWidth: +
 const FLOOR_MS = 700;                         // ~1.4 fps floor so streams never go blank
 const TILE_MIN_MS = +(process.env.TILE_MIN_MS || 80);  // per-tile push rate-cap (~12.5 fps/tile). CDP emits ~120fps/tile; forwarding every frame floods a phone link. Keep the freshest frame in lastFrame, forward at most one per window — ~10x bandwidth cut, no perceptible thumbnail loss.
 const FOCUS_MIN_MS = +(process.env.FOCUS_MIN_MS || 50); // focus push rate-cap (~20 fps). The focus socket emits up to ~32fps on a busy page; >20fps is imperceptible for monitoring but ~37% more bytes. Static agent pages emit few frames so the cap rarely bites; it only clamps the worst case. Freshest frame is always kept for the floor re-send + late joiners.
-// Render each watched browser at a real desktop viewport before capturing, so the stream shows the WHOLE page instead of a
-// clipped narrow window. CDP screencast mirrors the source viewport, so this is the only way to un-clip a too-small source.
-// On by default (NO_VIEWPORT_FIX=1 to keep the source's own size); VIEW_W/VIEW_H to tune. Cleared when we stop watching a session.
-const VIEWPORT_FIX = !process.env.NO_VIEWPORT_FIX;
+// Optionally render each watched browser at a real desktop viewport before capturing, so a clipped narrow source streams the
+// WHOLE page. OFF BY DEFAULT: this injects a CDP Emulation.setDeviceMetricsOverride, which FIGHTS any automation client
+// (Playwright/Puppeteer) that manages the page's own viewport — the two clients thrash, and the watched page visibly flickers
+// and zooms in/out. Opt in with VIEWPORT_FIX=1 ONLY for plain human/idle browsers (no automation) where you want a small/narrow
+// window captured as a full desktop page. VIEW_W/VIEW_H to tune. Cleared when we stop watching a session.
+const VIEWPORT_FIX = process.env.VIEWPORT_FIX === '1';
 const VIEW_W = +(process.env.VIEW_W || 1280), VIEW_H = +(process.env.VIEW_H || 800);
 // session-state classification lives in src/state.cjs (pure + unit-tested); bundled inline by the build step.
 const { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention } = __mod_state;
@@ -436,7 +438,7 @@ const BUILD = (() => { try { return crypto.createHash('sha1').update(fs.readFile
 // people running their own copy learn that a new version shipped. It only NOTIFIES + links — it never modifies
 // anyone's code. One outbound call to api.github.com; set NO_UPDATE_CHECK=1 to disable it entirely (airgap/privacy).
 const { isNewer } = __mod_version;
-const VERSION = '2.2.0';
+const VERSION = '2.2.1';
 const REPO = 'Zbrooklyn/Agent-Browser-Monitor';
 const REPO_URL = `https://github.com/${REPO}`;
 const UPDATE_CHECK = !process.env.NO_UPDATE_CHECK;

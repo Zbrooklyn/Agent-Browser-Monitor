@@ -2,6 +2,74 @@
 // Source: grid.src.cjs + src/*.cjs. Regenerate with: node build.cjs
 // Single self-contained file, zero external dependencies.
 
+const __mod_attach = (() => { const module = { exports: {} }; const exports = module.exports;
+// src/attach.cjs — PURE: the ordered CDP commands the monitor sends when it attaches to a
+// watched browser.
+//
+// INVARIANT: a monitor OBSERVES; it never reshapes what it observes. Every CDP command that
+// mutates the watched page is gated behind an explicit opt-in, so the DEFAULT attach is strictly
+// read-only (enable + screencast + a seed screenshot). This is the single source of truth that
+// test/passivity.test.cjs asserts against — if anyone adds a mutating command to the default
+// path, that test fails. (Pure + unit-tested; bundled inline by build.cjs.)
+
+// CDP methods that change the watched browser's state. Sending any of these makes the monitor
+// INVASIVE: it can fight an automation client (Playwright/Puppeteer) that manages the same page,
+// which shows up as the watched page flickering, zooming, or behaving differently under test.
+const MUTATING = new Set([
+  'Emulation.setDeviceMetricsOverride',  // forces viewport → fights the page's own viewport (flicker/zoom)
+  'Emulation.clearDeviceMetricsOverride',
+  'Emulation.setFocusEmulationEnabled',  // forces document.hasFocus()===true → breaks focus-dependent behaviour
+  'Page.setWebLifecycleState',           // forces active/frozen lifecycle → overrides the page's real state
+  'Page.close',                          // closes the target
+  'Input.dispatchMouseEvent',            // synthetic input (intentional, user-driven Control mode only)
+  'Input.dispatchKeyEvent',
+  'Input.insertText',
+]);
+function isMutating(method) { return MUTATING.has(method); }
+
+// opts:
+//   tile / hq : the Page.startScreencast params object for that stream
+//   tileQ / hqQ : seed-screenshot JPEG quality
+//   keepAlive : force focus-emulation + active lifecycle so a BACKGROUNDED tab keeps rendering
+//               (Chrome throttles unfocused tabs). MUTATES the page — only safe for plain,
+//               non-automated browsers. Off by default.
+//   viewportFix + viewW/viewH : render the page at a fixed desktop viewport so a small/narrow
+//               window streams the whole page. MUTATES the page — fights automation. Off by default.
+function pushOptInMutations(cmds, opts) {
+  if (opts.keepAlive) {
+    cmds.push({ method: 'Emulation.setFocusEmulationEnabled', params: { enabled: true } });
+    cmds.push({ method: 'Page.setWebLifecycleState', params: { state: 'active' } });
+  }
+  if (opts.viewportFix) {
+    cmds.push({ method: 'Emulation.setDeviceMetricsOverride', params: { width: opts.viewW, height: opts.viewH, deviceScaleFactor: 1, mobile: false } });
+  }
+}
+
+function tileAttach(opts = {}) {
+  const cmds = [
+    { method: 'Page.enable' },
+    { method: 'Page.getFrameTree' },
+    { method: 'Runtime.evaluate', params: { expression: 'document.readyState', returnByValue: true } }, // read-only load probe
+  ];
+  pushOptInMutations(cmds, opts);
+  cmds.push({ method: 'Page.startScreencast', params: opts.tile || {} });
+  cmds.push({ method: 'Page.captureScreenshot', params: { format: 'jpeg', quality: opts.tileQ } }); // seed: a static page emits no screencast frames
+  return cmds;
+}
+
+function focusAttach(opts = {}) {
+  const cmds = [{ method: 'Page.enable' }];
+  pushOptInMutations(cmds, opts);
+  cmds.push({ method: 'Page.startScreencast', params: opts.hq || {} });
+  cmds.push({ method: 'Page.captureScreenshot', params: { format: 'jpeg', quality: opts.hqQ } });
+  cmds.push({ method: 'Page.getLayoutMetrics' }); // read-only: real viewport size for click mapping
+  return cmds;
+}
+
+module.exports = { MUTATING, isMutating, tileAttach, focusAttach };
+
+return module.exports; })();
+
 const __mod_state = (() => { const module = { exports: {} }; const exports = module.exports;
 // src/state.cjs — pure session-state classification (NO side effects, requireable by tests).
 // Bundled back into the single-file grid.cjs by the build step; at runtime it carries zero external deps.
@@ -192,6 +260,13 @@ const FOCUS_MIN_MS = +(process.env.FOCUS_MIN_MS || 50); // focus push rate-cap (
 // window captured as a full desktop page. VIEW_W/VIEW_H to tune. Cleared when we stop watching a session.
 const VIEWPORT_FIX = process.env.VIEWPORT_FIX === '1';
 const VIEW_W = +(process.env.VIEW_W || 1280), VIEW_H = +(process.env.VIEW_H || 800);
+// KEEPALIVE forces focus-emulation + active lifecycle so a BACKGROUNDED watched tab keeps
+// rendering (Chrome throttles unfocused tabs). It MUTATES the watched page, so it fights
+// automation clients — OFF by default. The idle-recapture sweep re-seeds stalled tiles either way.
+const KEEPALIVE = process.env.KEEPALIVE === '1';
+// attach command sequences are pure + tested (src/attach.cjs) and PASSIVE by default — no command
+// mutates a watched browser unless VIEWPORT_FIX/KEEPALIVE opt in. test/passivity.test.cjs guards this.
+const { tileAttach, focusAttach } = __mod_attach;
 // session-state classification lives in src/state.cjs (pure + unit-tested); bundled inline by the build step.
 const { ACTIVE_MS, HANG_MS, NEEDS_RE, stateOf, needsAttention } = __mod_state;
 
@@ -284,10 +359,11 @@ function connect(s) {
     const ws = new WebSocket(s.wsUrl); s.ws = ws; let id = 0;
     const send = (m, p = {}) => { try { ws.send(JSON.stringify({ id: ++id, method: m, params: p })); } catch {} };
     s.send = send;   // exposed so the idle-recapture sweep can re-seed a stalled/blank tile
-    // focus-emulation + active lifecycle keep rAF/animations running even though these windows are backgrounded/occluded
-    // (Chrome throttles rendering of unfocused tabs → animated pages would otherwise look frozen in the stream)
-    // captureScreenshot seed: a static / just-opened page emits NO screencast frames, so without a seed the tile is blank until something moves
-    ws.onopen = () => { send('Page.enable'); send('Page.getFrameTree'); send('Runtime.evaluate', { expression: 'document.readyState', returnByValue: true }); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); if (VIEWPORT_FIX) send('Emulation.setDeviceMetricsOverride', { width: VIEW_W, height: VIEW_H, deviceScaleFactor: 1, mobile: false }); send('Page.startScreencast', TILE); send('Page.captureScreenshot', { format: 'jpeg', quality: TILE.quality }); s.lastActivityAt = Date.now(); };
+    // PASSIVE BY DEFAULT: tileAttach (src/attach.cjs) emits only read-only commands + the screencast +
+    // a seed screenshot (a static page emits no frames until something moves). focus-emulation, active
+    // lifecycle, and the viewport override are added ONLY when KEEPALIVE/VIEWPORT_FIX opt in — they
+    // mutate the watched page and fight automation clients, so we never inject them by default.
+    ws.onopen = () => { for (const c of tileAttach({ keepAlive: KEEPALIVE, viewportFix: VIEWPORT_FIX, viewW: VIEW_W, viewH: VIEW_H, tile: TILE, tileQ: TILE.quality })) send(c.method, c.params); s.lastActivityAt = Date.now(); };
     // hot loop: fully guarded. reduceTileMessage (src/cdp.cjs, unit-tested) mutates s + returns side-effect actions;
     // a malformed/partial CDP frame can never throw out of this handler.
     ws.onmessage = (ev) => {
@@ -313,8 +389,11 @@ function hqConnect(slug) {
     const ws = new WebSocket(s.wsUrl); h.ws = ws; let id = 0;
     const send = (m, p = {}) => { const i = ++id; try { ws.send(JSON.stringify({ id: i, method: m, params: p })); } catch {} return i; };
     h.send = send;                                   // exposed so /api/input can dispatch on this focus socket
-    // setDeviceMetricsOverride is per-CDP-client in modern Chrome, so the focus socket must set its OWN desktop-viewport override — without it, a source browser with a narrow/portrait window streams a clipped, portrait frame to the focus view (the tile session's override does not carry over). Mirrors the tile onopen so focus and grid render the same whole-page viewport.
-    ws.onopen = () => { send('Page.enable'); send('Emulation.setFocusEmulationEnabled', { enabled: true }); send('Page.setWebLifecycleState', { state: 'active' }); if (VIEWPORT_FIX) send('Emulation.setDeviceMetricsOverride', { width: VIEW_W, height: VIEW_H, deviceScaleFactor: 1, mobile: false }); send('Page.startScreencast', HQ); send('Page.captureScreenshot', { format: 'jpeg', quality: HQ.quality }); h.lmId = send('Page.getLayoutMetrics'); };
+    // PASSIVE BY DEFAULT, same as the tile socket: focusAttach (src/attach.cjs) emits read-only commands +
+    // the HQ screencast + seed + a layout-metrics read (for click mapping). Each focus client is its OWN
+    // CDP client, so VIEWPORT_FIX/KEEPALIVE must be re-applied here when opted in — but by default this
+    // socket mutates nothing, so opening a focus view can never disturb the watched browser.
+    ws.onopen = () => { for (const c of focusAttach({ keepAlive: KEEPALIVE, viewportFix: VIEWPORT_FIX, viewW: VIEW_W, viewH: VIEW_H, hq: HQ, hqQ: HQ.quality })) { const mid = send(c.method, c.params); if (c.method === 'Page.getLayoutMetrics') h.lmId = mid; } };
     ws.onmessage = (ev) => {
       let m; try { m = JSON.parse(ev.data); } catch { return; }
       try {
@@ -438,7 +517,7 @@ const BUILD = (() => { try { return crypto.createHash('sha1').update(fs.readFile
 // people running their own copy learn that a new version shipped. It only NOTIFIES + links — it never modifies
 // anyone's code. One outbound call to api.github.com; set NO_UPDATE_CHECK=1 to disable it entirely (airgap/privacy).
 const { isNewer } = __mod_version;
-const VERSION = '2.2.1';
+const VERSION = '2.3.0';
 const REPO = 'Zbrooklyn/Agent-Browser-Monitor';
 const REPO_URL = `https://github.com/${REPO}`;
 const UPDATE_CHECK = !process.env.NO_UPDATE_CHECK;

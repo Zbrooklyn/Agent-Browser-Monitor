@@ -1,6 +1,6 @@
 {
   "name": "agent-browser-monitor",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Zero-dependency CDP-screencast grid dashboard for watching many AI-driven browsers from a phone.",
   "license": "MIT",
   "private": true,

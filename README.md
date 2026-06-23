@@ -191,6 +191,7 @@ node grid.cjs [host] [port]
 | `FOCUS_MIN_MS` | `50` | focused-view push rate-cap (~16–20 fps). The focus socket emits up to ~32 fps on a busy page; capping it roughly halves bytes with no perceptible loss for monitoring. Lower toward `25` for buttery motion at higher bandwidth, raise to throttle a constrained link. |
 | `VIEWPORT_FIX` | _(off)_ | set to `1` to render each watched browser at a desktop viewport (`VIEW_W`×`VIEW_H`) so a small/narrow window streams the whole page. **Off by default**: it injects a device-metrics override that fights any automation client (Playwright/Puppeteer) managing the page's own viewport — the two thrash and the watched page flickers/zooms. Only enable it for plain, non-automated browsers. |
 | `VIEW_W` / `VIEW_H` | `1280` / `800` | desktop viewport used when `VIEWPORT_FIX=1` |
+| `KEEPALIVE` | _(off)_ | set to `1` to force focus-emulation + active lifecycle so a **backgrounded** watched tab keeps rendering at full rate (Chrome throttles unfocused tabs). **Off by default**: it mutates the page (`document.hasFocus()`, lifecycle) and can interfere with automation clients. Idle tiles are re-seeded by the recapture sweep regardless, so leave it off unless you watch real backgrounded windows and need them buttery. |
 | `STUCK_MS` | `25000` | a top-frame navigation still loading this long with no load event → "stuck" |
 | `NO_UPDATE_CHECK` | _(unset)_ | set to disable the once-a-day GitHub update check (see Updates) |
 

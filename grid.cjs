@@ -436,6 +436,8 @@ function dispatchInput(j) {
     const dX = Math.round((+j.dxf || 0) * vw + (+j.dx || 0));   // client sends fractions of the viewport (dxf/dyf); accept raw px too
     const dY = Math.round((+j.dyf || 0) * vh + (+j.dy || 0));
     h.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: X, y: Y, deltaX: dX, deltaY: dY });
+  } else if (j.kind === 'move') {                                // desktop hover: drive :hover/menus so control feels native
+    h.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: X, y: Y, button: 'none' });
   } else if (j.kind === 'text') {
     if (typeof j.text === 'string' && j.text) h.send('Input.insertText', { text: j.text });
     else return false;
@@ -479,6 +481,19 @@ function killSession(slug) {
   return true;
 }
 
+// user-typed address bar → navigate the watched tab. A mutation, but EXPLICIT and user-initiated
+// (same category as a click/keystroke in Control), so it's same-origin guarded like /api/input, not
+// part of the passive default attach.
+function navigateSession(slug, url) {
+  const s = sessionBySlug(slug);
+  if (!s || !s.send || !s.ws) return false;
+  let u = String(url || '').trim();
+  if (!u) return false;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(u) && !/^about:/i.test(u)) u = 'https://' + u;  // bare host → https
+  try { s.send('Page.navigate', { url: u }); } catch { return false; }
+  return true;
+}
+
 const MARK = '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="2.2" fill="#3ecf8e"/><rect x="13" y="2" width="9" height="9" rx="2.2" fill="#3a3a40"/><rect x="2" y="13" width="9" height="9" rx="2.2" fill="#3a3a40"/><rect x="13" y="13" width="9" height="9" rx="2.2" fill="#3a3a40"/></svg>';
 const ICO1 = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2.2"/></svg>';
 const ICO2 = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="14" rx="1.8"/><rect x="13" y="5" width="8" height="14" rx="1.8"/></svg>';
@@ -517,7 +532,7 @@ const BUILD = (() => { try { return crypto.createHash('sha1').update(fs.readFile
 // people running their own copy learn that a new version shipped. It only NOTIFIES + links — it never modifies
 // anyone's code. One outbound call to api.github.com; set NO_UPDATE_CHECK=1 to disable it entirely (airgap/privacy).
 const { isNewer } = __mod_version;
-const VERSION = '2.3.0';
+const VERSION = '2.4.0';
 const REPO = 'Zbrooklyn/Agent-Browser-Monitor';
 const REPO_URL = `https://github.com/${REPO}`;
 const UPDATE_CHECK = !process.env.NO_UPDATE_CHECK;
@@ -739,12 +754,14 @@ body.offline #empty .emsg-off{display:block}
 #ftypebtn{display:none}
 #focus.ctl #ftypebtn{display:inline-flex}
 #fctl.on{color:#06210d;background:var(--live);box-shadow:0 0 16px #3ecf8e66}
+#ftypebtn.on{color:#241400;background:#e0a44e;box-shadow:0 0 14px #e0a44e66}                     /* lit amber while keys go to the page — the desktop "typing is live" signal */
 #focus.ctl #fnav{display:none}          /* pager hidden while controlling — bottom belongs to the control pills */
 #fnav #fzap{display:none}                /* drop the redundant jump-to-active to slim the pager (beats #fnav button) */
 #focus.idle #fctlbar{opacity:0;pointer-events:none}
 /* control mode: the floating pill-cluster becomes a full-width solid toolbar so the page can dock above it, never under it */
 #focus.ctl #fctlbar{left:0;right:0;bottom:var(--kb,0px);justify-content:center;gap:10px;padding:11px 12px calc(11px + env(safe-area-inset-bottom));background:#0d0d10f2;border-top:1px solid var(--line);transition:bottom .18s ease}  /* --kb lifts the toolbar above the on-screen keyboard */
-#fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:linear-gradient(#000c,#0000);z-index:52;transition:opacity .25s}
+/* solid header (not a gradient): a gradient scrim bleeds a faded band onto the page and reads as a render glitch on light sites — a set header with a clean bottom border reads intentional */
+#fbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:11px 13px;padding-top:calc(11px + env(safe-area-inset-top));background:#0d0d10f2;backdrop-filter:blur(10px);border-bottom:1px solid var(--line);z-index:52;transition:opacity .25s}
 .glass{background:#000b;backdrop-filter:blur(8px);border:1px solid #ffffff1f}
 #back{display:flex;align-items:center;gap:5px;color:#fff;font-size:14px;font-weight:550;padding:9px 14px;border-radius:11px;cursor:pointer}
 #back:active{background:#000d}
@@ -752,8 +769,21 @@ body.offline #empty .emsg-off{display:block}
 .fnamerow{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
 #fname{font-weight:650;font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0;cursor:text;letter-spacing:.01em}
 #fname.editing{overflow:visible;outline:none;background:#ffffff1f;border-radius:6px;padding:1px 7px;box-shadow:0 0 0 1px #3ecf8e88}
-.fsub{display:flex;align-items:center;gap:7px;min-width:0;max-width:100%;padding-left:16px}
-#fdom{font:11.5px ui-monospace,SFMono-Regular,Consolas,monospace;color:#8b8b93;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.fsub{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;padding-left:16px}
+/* editable address bar: click to select+copy, edit/paste + Enter to navigate the watched tab */
+.urlbar{flex:1 1 auto;min-width:0;font:11.5px ui-monospace,SFMono-Regular,Consolas,monospace;color:#c2c6cc;background:#ffffff10;border:1px solid #ffffff14;border-radius:7px;padding:4px 9px;outline:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.urlbar::placeholder{color:#6b6b73}
+.urlbar:focus{color:#fff;background:#000a;border-color:#3ecf8e88;box-shadow:0 0 0 1px #3ecf8e55;text-overflow:clip}
+.urlbtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:28px;height:26px;border:1px solid #ffffff14;border-radius:7px;background:#ffffff10;color:#9aa0a6;cursor:pointer}
+.urlbtn:active{background:#000a;transform:scale(.94)}
+.urlbtn.ok{color:var(--live);border-color:#3ecf8e66}
+.urlbtn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* mode status pill: unmistakable on desktop where there's no keyboard popping up to signal "typing" */
+#fstatus{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+#fstatus i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:0 0 auto}
+#fstatus.watching{color:#9aa0a6;background:#ffffff12}
+#fstatus.controlling{color:#06210d;background:var(--live)}
+#fstatus.typing{color:#241400;background:#e0a44e}
 #ftime{font-size:11px;color:#8b8b93;white-space:nowrap;flex:0 0 auto}
 #ftime.stuck{color:#e0a44e}
 #fdot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#9aa0a6}
@@ -815,7 +845,7 @@ body.embed #focus{display:block}
 :focus-visible{outline:2px solid var(--live);outline-offset:2px}
 </style></head><body>
 <header id="top"><div id="hdr"><span class="brand">${MARK}<span>Agent Browsers</span></span><span id="count"><i class="dot"></i><b id="cnum">0</b><span class="lbl">&nbsp;live</span></span><a id="needs" href="/?show=needs"><i></i><b id="needn">0</b><span class="lbl">&nbsp;need you</span></a><div id="searchwrap" class="seg"><button id="searchbtn" aria-label="Search">${ICOSRCH}</button><input id="q" placeholder="filter…" aria-label="Filter sessions by name" autocomplete="off"></div><button id="filterbtn" aria-label="Filter &amp; options"><span class="fbadge" id="filterbadge">0</span>${ICOFUN}<span id="filterlbl">Filter</span></button><span id="lay"><button data-c="1" title="Single pane" aria-label="Single pane">${ICO1}</button><button data-c="2" title="Two columns" aria-label="Two columns">${ICO2}</button><button data-c="3" title="Three columns" aria-label="Three columns">${ICO3}</button></span></div>
-<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="sheetgrip" id="sheetgrip"></div><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
+<div id="bar"><div id="chips" class="seg"><button class="chip" data-show="">All</button><button class="chip" data-show="live">Live</button><button class="chip" data-show="idle">Idle</button><button class="chip" data-show="multi">Multi</button><button class="chip need" data-show="needs">Needs</button><button class="chip pinchip" data-show="pinned">Pinned</button></div><div id="tools" class="seg"><button id="selbtn" title="Select sessions to watch together" aria-label="Select">${ICOSEL}</button><button id="optbtn" title="Sort &amp; view options" aria-label="Options">${ICOSLID}</button></div></div><div id="optmenu"><div class="sheetgrip" id="sheetgrip"></div><div class="msec mob">Show</div><div id="showrow" class="mob"><span class="showseg"><button data-show="">All</button><button data-show="live">Live</button><button data-show="idle">Idle</button><button data-show="multi">Multi</button><button class="need" data-show="needs">Needs</button><button class="pinchip" data-show="pinned">Pinned</button></span></div><div class="msep mob"></div><div class="msec">Sort</div><div class="mrow" data-sort="">Active first<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="name">Name A–Z<span class="ck">${ICOCHK}</span></div><div class="mrow" data-sort="newest">Newest<span class="ck">${ICOCHK}</span></div><div class="msep"></div><div class="msec">View</div><div class="mrow rowflex" id="colrow"><span>Columns</span><span class="miniseg"><button data-c="1">1</button><button data-c="2">2</button><button data-c="3">3</button></span></div><div class="mrow" id="fitrow">${ICOFIT}Cover images<span class="swt"></span></div><div class="mrow mob" id="selrow">${ICOSEL}Select to watch…</div><div class="mrow" id="reorderrow">${ICOMOVE}Reorder tiles…</div><div class="mrow" id="activerow">${ICOZAP}Jump to most active</div><div class="mrow" id="reloadrow">${ICORELOAD}Reload app</div><div class="msep"></div><div class="msec">Settings</div><div class="mrow" id="notifrow">${ICOBELL}Notifications<span class="swt"></span></div><div class="mrow danger" id="clearrow">${ICOTRASH}Clear saved data</div><div class="msep"></div><div id="buildtag">Agent Browsers · build ${BUILD}</div></div></header>
 <div id="scrim"></div>
 <div id="ptr"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg></div>
 <div id="netbanner"><span class="nspin"></span><span>Reconnecting…</span></div>
@@ -825,11 +855,11 @@ body.embed #focus{display:block}
 <div id="hint"><span>Tap any tile to watch it full-screen. Pull down to refresh, and long-press a tile to reorder.</span><button id="hintok">Got it</button></div>
 <div id="updbar"><span class="ud-dot"></span><span id="updtxt"></span><a id="updlink" href="${REPO_URL}/releases" target="_blank" rel="noopener">View</a><button id="upddismiss" aria-label="Dismiss update notice">&times;</button></div>
 <div id="empty">${MARK}<div class="emsg"><h2>No agent browsers detected</h2><p>Start any Chromium with remote debugging and it shows up here automatically:</p><code class="ecmd">chrome --remote-debugging-port=9222</code><p class="esub">Works with Chrome, Edge or Brave &mdash; and with Playwright / pool browsers, which expose this by default.</p></div><div class="emsg-off"><h2>Can&rsquo;t reach the dashboard</h2><p>The server looks offline. This reconnects automatically the moment it&rsquo;s back.</p></div></div>
-<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span></span><span class="fsub"><span id="fdom"></span><span id="ftime"></span></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button><div class="sep"></div><button data-act="kill" class="danger">${ICOPOWER}<span>Close session</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fpmode" class="fbtn glass" aria-label="Pointer mode" title="Switch touch / trackpad pointer">${ICOTOUCH}<span>Touch</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"><i></i></div></div>
+<div id="focus"><img id="fimg" draggable="false" alt=""><div id="fbar"><button id="back" class="glass">&#x2039;&nbsp;Back</button><div id="fid"><span class="fnamerow"><span class="dot" id="fdot"></span><span id="fname" title="Tap to rename"></span><span id="ftime"></span><span id="fstatus" class="watching"><i></i><b>Watching</b></span></span><span class="fsub"><input id="furl" class="urlbar" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" aria-label="Address — edit and press Enter to go" placeholder="—"><button id="fcopy" class="urlbtn" title="Copy URL" aria-label="Copy URL">${ICOLINK}</button></span></div><button id="fmore" class="fbtn glass" aria-label="More actions" title="More">${ICODOTS}</button></div><div id="fmenu" class="glass"><button data-act="rotate">${ICOROT}<span>Rotate to fill</span></button><button class="pinrow" data-act="pin">${ICOSTAR}<span>Pin to top</span></button><button data-act="rename">${ICOPEN}<span>Rename</span></button><button data-act="copy">${ICOLINK}<span>Copy link</span></button><button data-act="save">${ICODL}<span>Save frame</span></button><div class="sep"></div><button data-act="fs">${ICOEXP}<span>Fullscreen</span></button><div class="sep"></div><button data-act="kill" class="danger">${ICOPOWER}<span>Close session</span></button></div><div id="fnav" class="glass"><button id="fzap" aria-label="Jump to most active" title="Jump to most active">${ICOZAP}</button><button id="prev" aria-label="Previous">&#x2039;</button><span id="flbl"></span><button id="next" aria-label="Next">&#x203A;</button></div><div id="fctlbar"><button id="ftypebtn" class="glass">${ICOKEYB}<span>Type</span></button><button id="fpmode" class="fbtn glass" aria-label="Pointer mode" title="Switch touch / trackpad pointer">${ICOTOUCH}<span>Touch</span></button><button id="fctl" class="glass" aria-label="Take control (tap to click)" title="Take control">${ICOCURSOR}<span>Control</span></button></div><input id="ftype" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type into the page"><div id="fcursor"><i></i></div></div>
 <script>
 const grid=document.getElementById('grid'),cnum=document.getElementById('cnum'),hdot=document.querySelector('#count .dot'),empty=document.getElementById('empty');
 const focus=document.getElementById('focus'),fimg=document.getElementById('fimg'),flbl=document.getElementById('flbl'),back=document.getElementById('back'),prev=document.getElementById('prev'),next=document.getElementById('next'),fnav=document.getElementById('fnav');
-const fname=document.getElementById('fname'),fdom=document.getElementById('fdom'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fmore=document.getElementById('fmore'),fmenu=document.getElementById('fmenu');
+const fname=document.getElementById('fname'),furl=document.getElementById('furl'),fcopy=document.getElementById('fcopy'),fstatus=document.getElementById('fstatus'),fdot=document.getElementById('fdot'),ftime=document.getElementById('ftime'),frot=document.getElementById('frot'),fzap=document.getElementById('fzap'),fmore=document.getElementById('fmore'),fmenu=document.getElementById('fmenu');
 const qbox=document.getElementById('q'),needsEl=document.getElementById('needs'),neednEl=document.getElementById('needn');
 const filterbtn=document.getElementById('filterbtn'),filterlbl=document.getElementById('filterlbl'),filterbadge=document.getElementById('filterbadge'),scrim=document.getElementById('scrim');
 const selbtn=document.getElementById('selbtn'),optbtn=document.getElementById('optbtn'),optmenu=document.getElementById('optmenu'),fitrow=document.getElementById('fitrow'),activerow=document.getElementById('activerow'),selrow=document.getElementById('selrow'),watchfab=document.getElementById('watchfab'),watchn=document.getElementById('watchn');
@@ -900,7 +930,7 @@ function shortTitle(t){if(!t)return '';const p=t.split(/\\s[|\\u2013\\u2014\\u00
 function syncFocusBar(){const m=meta.get(focusSlug)||{};const st=m.state||'idle';if(!editing)fname.textContent=shortTitle(m.title)||focusSlug;
   focus.setAttribute('aria-label',(shortTitle(m.title)||focusSlug||'session')+' live view');   // focus img stays alt="" (data-URI); label the region instead
   const pr=fmenu&&fmenu.querySelector('.pinrow');if(pr)pr.classList.toggle('on',pins.has(focusSlug)); // reflect pin state in the menu
-  fdom.textContent=m.url||'';                                  // full URL, not just the domain
+  if(furl&&document.activeElement!==furl)furl.value=m.url||'';  // full URL; don't clobber while the user is editing the address bar
   fdot.className='dot '+st;                                    // dot colored by live/idle/stuck state
   const ago=st==='active'?'live':(st==='stuck'?'stuck '+fmtAgo(m.lastChangeMs):fmtAgo(m.lastChangeMs));
   ftime.textContent=ago?('· '+ago):'';ftime.className=st==='stuck'?'stuck':'';
@@ -1031,7 +1061,10 @@ function layoutCtl(){if(!controlOn)return;
   focus.style.setProperty('--cbot',(barH+kb)+'px');                           // page docks above the toolbar, which is above the keyboard
 }
 if(window.visualViewport){visualViewport.addEventListener('resize',()=>{if(controlOn)requestAnimationFrame(layoutCtl);});visualViewport.addEventListener('scroll',()=>{if(controlOn)requestAnimationFrame(layoutCtl);});}
-function setControl(on){controlOn=on;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');if(ptrMode==='trackpad')focus.classList.add('tpad');
+let typingOn=false;
+// always-visible mode indicator: on desktop there's no keyboard pop-up to signal "typing", so the header pill (+ lit Type button) is the only way to know whether keys/clicks go to the page
+function setStatus(){if(!fstatus)return;const mode=typingOn?'typing':(controlOn?'controlling':'watching');fstatus.className=mode;const b=fstatus.querySelector('b');if(b)b.textContent=mode==='typing'?'Typing':(mode==='controlling'?'Controlling':'Watching');if(ftypebtn)ftypebtn.classList.toggle('on',typingOn);}
+function setControl(on){controlOn=on;if(!on)typingOn=false;focus.classList.toggle('ctl',on);if(fctl)fctl.classList.toggle('on',on);setStatus();if(on){if(focus.classList.contains('rot'))toggleRot();resetZoom();focus.classList.remove('idle');if(ptrMode==='trackpad')focus.classList.add('tpad');
     requestAnimationFrame(()=>{layoutCtl();if(controlOn&&ptrMode==='trackpad'){centerCursor();showCursor(true);}});   // dock the page, THEN center the cursor in the docked box
   }else{if(ftype)ftype.blur();lastMid=null;if(fcursor)fcursor.classList.remove('show');}buzz(on?14:8);}
 addEventListener('resize',()=>{if(controlOn)requestAnimationFrame(layoutCtl);});                 // keyboard open / rotate / bar reflow re-docks the page
@@ -1048,7 +1081,24 @@ function cancelMomentum(){if(momRAF){cancelAnimationFrame(momRAF);momRAF=0;}}
 function startMomentum(){cancelMomentum();let vx=vel.x,vy=vel.y;const sp=Math.hypot(vx,vy);if(sp<0.3)return;const cap=2.5;if(sp>cap){vx*=cap/sp;vy*=cap/sp;}const c=imgContent();let last=Date.now();const step=()=>{const n=Date.now(),dt=Math.min(40,n-last);last=n;sendInput({kind:'wheel',xf:.5,yf:.5,dxf:-vx*dt/c.dw,dyf:-vy*dt/c.dh});const fr=Math.pow(.94,dt/16);vx*=fr;vy*=fr;momRAF=Math.hypot(vx,vy)>0.02?requestAnimationFrame(step):0;};momRAF=requestAnimationFrame(step);}
 if(ftypebtn)ftypebtn.onclick=e=>{e.stopPropagation();if(ftype)ftype.focus();buzz(10);};
 if(ftype){ftype.addEventListener('input',()=>{const v=ftype.value;if(v){sendInput({kind:'text',text:v});ftype.value='';}});
-  ftype.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();sendInput({kind:'key',key:'Enter'});}else if(e.key==='Backspace'){e.preventDefault();sendInput({kind:'key',key:'Backspace'});}else if(e.key==='Tab'){e.preventDefault();sendInput({kind:'key',key:'Tab'});}});}
+  ftype.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();sendInput({kind:'key',key:'Enter'});}else if(e.key==='Backspace'){e.preventDefault();sendInput({kind:'key',key:'Backspace'});}else if(e.key==='Tab'){e.preventDefault();sendInput({kind:'key',key:'Tab'});}});
+  ftype.addEventListener('focus',()=>{typingOn=true;setStatus();});                    // keys now go to the page — show it
+  ftype.addEventListener('blur',()=>{typingOn=false;setStatus();});}
+
+// ---- editable address bar: copy, edit/paste + Enter to navigate the watched tab ----
+if(furl){
+  furl.addEventListener('focus',()=>furl.select());                                     // one-click select-all = easy copy
+  furl.addEventListener('keydown',e=>{e.stopPropagation();                              // never let the address bar's keys reach the page-control handlers
+    if(e.key==='Enter'){e.preventDefault();const v=furl.value.trim();if(v&&focusSlug){buzz(12);fetch('/api/nav',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:focusSlug,url:v})}).catch(()=>{});furl.blur();}}
+    else if(e.key==='Escape'){e.preventDefault();furl.value=(meta.get(focusSlug)||{}).url||'';furl.blur();}});
+}
+if(fcopy){fcopy.onclick=async e=>{e.stopPropagation();const v=(furl&&furl.value)||(meta.get(focusSlug)||{}).url||'';if(!v)return;try{await navigator.clipboard.writeText(v);fcopy.classList.add('ok');setTimeout(()=>fcopy.classList.remove('ok'),900);buzz(12);}catch(_){}};}
+
+// ---- desktop mouse: wheel scrolls, movement drives hover — so Control feels like a real browser ----
+let lastHover=0;
+function relayWheel(e){if(!controlOn)return;const f=imgFrac(e.clientX,e.clientY);if(!f)return;e.preventDefault();sendInput({kind:'wheel',xf:f.xf,yf:f.yf,dx:e.deltaX,dy:e.deltaY});}
+fimg.addEventListener('wheel',relayWheel,{passive:false});
+fimg.addEventListener('pointermove',e=>{if(!controlOn||e.pointerType!=='mouse')return;const n=Date.now();if(n-lastHover<45)return;lastHover=n;const f=imgFrac(e.clientX,e.clientY);if(f)sendInput({kind:'move',xf:f.xf,yf:f.yf});});
 
 // ---------- tiles ----------
 function setTabs(x,n){x.tn.textContent=n;x.el.classList.toggle('multi',n>1);}
@@ -1131,7 +1181,9 @@ function setState(x,s){x.el.classList.remove('state-active','state-idle','state-
 // ---------- which sessions to show (watch set + query filters + sort) ----------
 function applyGrid(){
   if(dragId)return;                                            // don't reshuffle mid-drag
-  const q=(params.get('q')||'').toLowerCase(),show=params.get('show'),sort=params.get('sort');
+  const q=(params.get('q')||'').toLowerCase(),sort=params.get('sort');
+  let show=params.get('show');
+  if(show==='pinned'&&!pins.size){show='';params.delete('show');try{savePref('show','');}catch(_){}} // last pin removed while filtered → fall back to All, don't strand on an empty grid
   let list=all.slice();
   if(watch)list=list.filter(s=>watch.includes(s.id));
   if(q)list=list.filter(s=>(s.id+' '+(s.title||'')+' '+(s.url||'')).toLowerCase().includes(q));
@@ -1139,6 +1191,8 @@ function applyGrid(){
   else if(show==='idle')list=list.filter(s=>s.state==='idle');
   else if(show==='multi')list=list.filter(s=>s.tabs>1);
   else if(show==='needs')list=list.filter(s=>s.needs);
+  else if(show==='pinned')list=list.filter(s=>pins.has(s.id));
+  document.querySelectorAll('.pinchip').forEach(c=>c.style.display=pins.size?'':'none'); // the Pinned filter only appears once something is pinned (never a dead/empty chip)
   if(sort==='name')list.sort((a,b)=>a.id.localeCompare(b.id));
   else if(sort==='newest')list.sort((a,b)=>b.port-a.port);
   else if(customOrder){const ix=id=>{const i=customOrder.indexOf(id);return i<0?1e9:i;};list.sort((a,b)=>(ix(a.id)-ix(b.id))||((b.state==='active')-(a.state==='active')));} // user's drag order
@@ -1365,6 +1419,12 @@ const server = http.createServer((req, res) => {
     if (!localOrigin(req)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"ok":false,"err":"origin"}'); return; }
     let body = ''; req.on('data', c => { body += c; if (body.length > 4096) req.destroy(); });
     req.on('end', () => { let j = null; try { j = JSON.parse(body); } catch {} const ok = !!(j && j.slug && killSession(j.slug)); res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(`{"ok":${ok}}`); });
+    return;
+  }
+  if (req.method === 'POST' && u === '/api/nav') {      // address-bar navigate the watched tab — same-origin guarded, like /api/input
+    if (!localOrigin(req)) { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"ok":false,"err":"origin"}'); return; }
+    let body = ''; req.on('data', c => { body += c; if (body.length > 8192) req.destroy(); });
+    req.on('end', () => { let j = null; try { j = JSON.parse(body); } catch {} const ok = !!(j && j.slug && navigateSession(j.slug, j.url)); res.writeHead(ok ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(`{"ok":${ok}}`); });
     return;
   }
   if (u === '/api/sessions') {

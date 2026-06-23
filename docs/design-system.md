@@ -18,10 +18,14 @@ Was 25 distinct paddings (11,12,13,7,9 common — off-grid). Map odd → nearest
 Was 13 sizes incl. 12.5 / 12.8 half-pixels. Map: 10→11, 11.5→12, 12.5/12.8→13, 14/14.5→15,
 17/19→18, 21→22. Weights: 550 body · 650 emphasis · 700 strong.
 
-## 4. Color — extend tokens, kill near-duplicate hex (was 76 distinct hardcoded, ~28% tokenized)
+## 4. Color — extend tokens, kill near-duplicate hex
 Keep: `--bg --panel --line --line2 --muted --live --amber --gold`.
-Add: `--text` (primary) · `--dim` (secondary) · `--faint` (tertiary) · `--surface` (header/toolbar glass) · `--scrim`.
-Collapse the grays (#8b8b93 / #8a8a93 / #9aa0a6 / #c2c6cc …) into `--muted` / `--dim` / `--faint`.
+Added: `--text:#e6e6ea` (primary) · `--dim:#cfcfd6` (secondary) · `--faint:#6b6b73` (tertiary) · `--surface:#0d0d10f2` (header/toolbar glass).
+Collapsed 14 stray gray literals → tokens: light (e6e6ea/e8e8ee/dcdce2)→`--text`; light-mid (cfcfd6/d4d4da/c8ccd2/c2c6cc)→`--dim`;
+neutral/idle (9aa0a6×6/9a9aa3/8b8b93/8a8a93)→`--muted`; 6b6b73→`--faint`. `--scrim` not added (YAGNI — single #0b0b0dcc use).
+**Documented exceptions** (considered, not drift, kept literal): `#cdd6e6` cool-tinted code text in `.ecmd`; `#f0b860`
+brighter amber for the on-amber-tint `#needs` button; the URL-encoded `%238a8a93` arrow inside the `#sortsel` SVG data-URI;
+the standalone device-lock page (`background:#0f1115;color:#e6e6ea`) — it's a bare `<body>` served with no `:root`, so a `var()` there is undefined.
 
 ## 5. Contrast — WCAG AA on the REAL surface
 Body text ≥ 4.5:1, large/secondary ≥ 3:1, measured against the actual rendered background
@@ -32,6 +36,6 @@ Body text ≥ 4.5:1, large/secondary ≥ 3:1, measured against the actual render
 - [x] Radius scale converged + verified — rendered radii now only 8/12/16/50%/999px (was 10 distinct)
 - [x] Type scale converged + verified — half-pixels (11.5/12.5/12.8/14.5) + outliers (10/19/21) snapped onto 11/12/13/14/15/17/22; no overflow, on-scale by computed style. (Kept whole-number sizes pragmatically; a rigid ratio would churn a liked UI for no gain. Icon-only buttons compute the UA 13.33px — text-less, cosmetically nil.)
 - [ ] Spacing grid converged + verified  ← did type first to de-risk; spacing is the highest-layout-risk pass
-- [ ] Color tokens converged + verified
+- [x] Color tokens converged + verified — 14 near-duplicate gray literals collapsed to 4 tokens (--text/--dim/--faint + --muted). Every token resolves by computed style; remaps land on intended hex (#fstatus/#ftime →#8a8a93, .urlbar →#cfcfd6, tile .d →#8a8a93). Visually verified on 8 real live sessions (grid + focus header) — no perceptible shift, chrome reads clean. 3 considered colors kept as documented exceptions.
 - [ ] Contrast AA audited + fixed
 - [ ] Final before/after visual pass, committed, released

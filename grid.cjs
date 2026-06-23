@@ -564,7 +564,7 @@ const GRID = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(reg=>{reg.update();setInterval(()=>reg.update(),60000);reg.addEventListener('updatefound',()=>{const w=reg.installing;w&&w.addEventListener('statechange',()=>{if(w.state==='activated')location.reload();});});}).catch(()=>{});let _r=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!_r){_r=true;location.reload();}});}</script>
 <title>Agent Browsers</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0b0d;--panel:#141417;--line:#26262c;--line2:#34343c;--muted:#8a8a93;--text:#e6e6ea;--dim:#cfcfd6;--faint:#6b6b73;--live:#3ecf8e;--amber:#e0a44e;--gold:#e8c66a;--surface:#0d0d10f2;--r-sm:8px;--r-md:12px;--r-lg:16px}
+:root{color-scheme:dark;--bg:#0b0b0d;--panel:#141417;--line:#26262c;--line2:#34343c;--muted:#8a8a93;--text:#e6e6ea;--dim:#cfcfd6;--live:#3ecf8e;--amber:#e0a44e;--gold:#e8c66a;--surface:#0d0d10f2;--r-sm:8px;--r-md:12px;--r-lg:16px}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,Segoe UI,Roboto,sans-serif;height:100%;-webkit-font-smoothing:antialiased;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 /* custom touch gestures own the long-press/drag — re-enable native text behavior only where typing happens */
@@ -772,7 +772,7 @@ body.offline #empty .emsg-off{display:block}
 .fsub{display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;padding-left:16px}
 /* editable address bar: click to select+copy, edit/paste + Enter to navigate the watched tab */
 .urlbar{flex:1 1 auto;min-width:0;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--dim);background:#ffffff10;border:1px solid #ffffff14;border-radius:var(--r-sm);padding:4px 9px;outline:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.urlbar::placeholder{color:var(--faint)}
+.urlbar::placeholder{color:var(--muted)}
 .urlbar:focus{color:#fff;background:#000a;border-color:#3ecf8e88;box-shadow:0 0 0 1px #3ecf8e55;text-overflow:clip}
 .urlbtn{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:28px;height:26px;border:1px solid #ffffff14;border-radius:var(--r-sm);background:#ffffff10;color:var(--muted);cursor:pointer}
 .urlbtn:active{background:#000a;transform:scale(.94)}
